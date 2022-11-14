@@ -1,6 +1,6 @@
+import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
 import { BlockCodec, LinkCodec, linkCodecFactory, blockCodecFactory, multiBlockCodecFactory } from "../codecs"
 import { graphStore } from "../graph-store"
-import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
 import { chunkerFactory } from "../chunking"
 import { Graph } from "../graph"
 import { BlockStore, memoryBlockStoreFactory } from "../block-store"
@@ -9,8 +9,8 @@ import { RequestBuilder, navigateVertices, PathElemType } from '../navigate'
 import { OFFSET_INCREMENTS } from "../serde"
 import * as assert from 'assert'
 
-import { ProtoGremlinFactory, protoGremlinFactory } from '../api/proto-gremlin-factories'
-import { ProtoGremlin } from '../api/proto-gremlin'
+import { protoGremlinFactory, ProtoGremlin, ProtoGremlinFactory } from '../api/proto-gremlin'
+
 import { incl, isTrue } from "../ops"
 
 const { chunk } = chunkerFactory(1024, compute_chunks)

@@ -1,25 +1,21 @@
 
 import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
-import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { chunkerFactory } from "../chunking"
 import { RootStore, emptyRootStore } from "../root-store"
 import { graphStore } from "../graph-store"
 import { Graph } from "../graph"
 import { BlockStore, memoryBlockStoreFactory } from "../block-store"
 import { BlockCodec, blockCodecFactory, LinkCodec, linkCodecFactory } from "../codecs"
-import { EdgeDecoder, EdgeEncoder, OFFSET_INCREMENTS, PropDecoder, PropEncoder, VertexDecoder, VertexEncoder } from "../serde"
 import { Edge, Prop, Status, Vertex } from "../types"
 import { deltaFactory } from "../delta"
 
-const { create, read, append, update, remove, readIndex } = chunkyStore()
-const { chunk } = chunkerFactory(512, compute_chunks)
 
+const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 import * as assert from 'assert'
-import { navigateVertices, PathElemType, RequestBuilder } from "../navigate"
 
 describe('Multi tx', function () {
 

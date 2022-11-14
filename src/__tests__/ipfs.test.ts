@@ -1,5 +1,4 @@
-import { protoGremlinFactory } from '../api/proto-gremlin-factories'
-import { ProtoGremlin } from '../api/proto-gremlin'
+import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import { VertexRef } from '../types'
 import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
 import { chunkerFactory } from '../chunking'

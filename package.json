@@ -1,13 +1,13 @@
 {
   "name": "@dstanesc/O-O-O-O-O-O-O",
-  "description": "",
-  "version": "0.0.1",
+  "description": "O7 is the next level persistence. There is cloud continuum and there is local store. Locality first, non local next.",
+  "version": "0.0.2",
   "homepage": "https://github.com/dstanesc/O-O-O-O-O-O-O",
   "repository": "https://github.com/dstanesc/O-O-O-O-O-O-O",
   "license": "(Apache-2.0 AND MIT)",
   "author": "dstanesc <dstanesc@gmail.com>",
   "type": "module",
-  "main": "./dist/main.js",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {

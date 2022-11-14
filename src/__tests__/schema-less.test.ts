@@ -6,9 +6,7 @@ import { Graph } from "../graph"
 import { BlockStore, memoryBlockStoreFactory } from "../block-store"
 import { RootStore, emptyRootStore } from "../root-store"
 
-import { protoGremlinFactory } from '../api/proto-gremlin-factories'
-import { ProtoGremlin } from '../api/proto-gremlin'
-
+import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
 import { navigateVertices, PathElemType, RequestBuilder } from "../navigate"
 import { Status } from "../types"

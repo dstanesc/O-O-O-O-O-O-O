@@ -1,10 +1,34 @@
-
-
-
 import { Graph, Tx } from "../graph"
+import { LinkCodec, BlockCodec } from "../codecs"
+import { graphStore } from "../graph-store"
+import { BlockStore } from "../block-store"
+import { RootStore } from "../root-store"
+import { IndexStore } from "../index-store"
+
 
 import { Edge, EdgeRef, Prop, PropValue, KeyType, Vertex, VertexRef, VertexType, EdgeType, PropType, Link, RootIndex, Block, Part, Ref, Type, IndexType } from "../types"
 import { EdgePathElem, ExtractPathElem, PathElem, PathElemType, PropPredicate, VertexPathElem, navigateVertices, navigateEdges, NavigationThreshold } from "../navigate"
+
+interface ProtoGremlinFactory {
+    g: () => ProtoGremlin
+}
+
+const protoGremlinFactory = ({ chunk, linkCodec, blockCodec, blockStore, rootStore, indexStore }: {
+    chunk: (buffer: Uint8Array) => Uint32Array,
+    linkCodec: LinkCodec,
+    blockCodec: BlockCodec,
+    blockStore: BlockStore,
+    rootStore: RootStore,
+    indexStore?: IndexStore
+}): ProtoGremlinFactory => {
+
+    const g = (): ProtoGremlin => {
+        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const graph = new Graph(rootStore, store, indexStore)
+        return new ProtoGremlin(graph)
+    }
+    return { g }
+}
 
 
 interface Navigation {
@@ -361,5 +385,4 @@ class ProtoGremlin {
     }
 }
 
-
-export { ProtoGremlin, ProtoGremlinTransaction, NavigateVertexWrapper, NavigateEdgeWrapper } 
+export { ProtoGremlinFactory, ProtoGremlin, ProtoGremlinTransaction, NavigateVertexWrapper, NavigateEdgeWrapper, protoGremlinFactory } 

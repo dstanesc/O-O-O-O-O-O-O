@@ -1,4 +1,3 @@
-export * from './api/proto-gremlin-factories'
 export * from './api/proto-gremlin'
 export * from './block-index'
 export * from './block-store'

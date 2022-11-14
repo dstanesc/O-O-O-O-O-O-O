@@ -5,14 +5,10 @@ import { chunkerFactory } from "../chunking"
 import { Graph } from "../graph"
 import { BlockStore, memoryBlockStoreFactory } from "../block-store"
 import { RootStore, emptyRootStore } from "../root-store"
-import { OFFSET_INCREMENTS } from "../serde"
-
-import { ProtoGremlinFactory, protoGremlinFactory } from '../api/proto-gremlin-factories'
-import { ProtoGremlin, ProtoGremlinTransaction, NavigateVertexWrapper, NavigateEdgeWrapper } from '../api/proto-gremlin'
-
+import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
-import { EdgePathElem, navigateVertices, PathElemType, VertexPathElem, RequestBuilder } from "../navigate"
-import { Vertex, Prop, Edge } from "../types"
+import { navigateVertices, PathElemType, RequestBuilder } from "../navigate"
+
 import { eq } from "../ops"
 
 describe('Filter data', function () {

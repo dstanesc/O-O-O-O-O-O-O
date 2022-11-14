@@ -1,5 +1,4 @@
-import { ProtoGremlinFactory, protoGremlinFactory } from './api/proto-gremlin-factories'
-import { ProtoGremlin } from './api/proto-gremlin'
+import { protoGremlinFactory, ProtoGremlin } from './api/proto-gremlin'
 
 import bent from 'bent'
 import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
