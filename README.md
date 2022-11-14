@@ -31,7 +31,7 @@ for await (const result of g.V([v1.offset]).out().exec()) {
 }
 ```
 
-Proto-schema based navigation and retrieval based on proto-gremlin API (loads 15 blocks to resolve the query)
+Proto-schema based navigation and retrieval based on proto-gremlin API
 
 ```ts
 enum ObjectTypes {
@@ -62,7 +62,11 @@ const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
 const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
 const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
 
-const result = await queryVerse(g, 0, 'Gen', 1, 1)
+// quick scan loads 15 blocks
+const r1 = await queryVerse(g, 0, 'Gen', 1, 1)
+
+// full scan loads 594 blocks (401 blocks if indexed)
+const r2 = await queryVerse(g, 0, 'Rev', 22, 21)
 
 async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, chapter: number, verse: number): Promise<{ result: string, time: number }> {
     const vr = []
