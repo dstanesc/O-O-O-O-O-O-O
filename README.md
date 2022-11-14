@@ -62,10 +62,10 @@ const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
 const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
 const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
 
-// quick scan loads 15 blocks
+// quick scan loads 15 blocks from 31549 total
 const r1 = await queryVerse(g, 0, 'Gen', 1, 1)
 
-// full scan loads 594 blocks (401 blocks if indexed)
+// full scan loads 594 blocks (401 blocks if indexed) from 31549 total
 const r2 = await queryVerse(g, 0, 'Rev', 22, 21)
 
 async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, chapter: number, verse: number): Promise<{ result: string, time: number }> {
