@@ -2,12 +2,21 @@ import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
 import bent from 'bent'
 import { VertexRef } from '../types'
-import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
+import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
-import { BlockStore, MemoryBlockStore, memoryBlockStoreFactory } from '../block-store'
-import { LinkCodec, linkCodecFactory, BlockCodec, blockCodecFactory } from '../codecs'
+import {
+    BlockStore,
+    MemoryBlockStore,
+    memoryBlockStoreFactory,
+} from '../block-store'
+import {
+    LinkCodec,
+    linkCodecFactory,
+    BlockCodec,
+    blockCodecFactory,
+} from '../codecs'
 import { RootStore, emptyRootStore } from '../root-store'
-import { indexStoreFactory } from "../index-store-factory"
+import { indexStoreFactory } from '../index-store-factory'
 import { eq } from '../ops'
 
 const getStream = bent('https://raw.githubusercontent.com')
@@ -22,31 +31,30 @@ enum ObjectTypes {
 enum RlshpTypes {
     book = 1,
     chapter = 2,
-    verse = 3
-
+    verse = 3,
 }
 
 enum PropTypes {
-    ANY = 1
+    ANY = 1,
 }
 
 enum KeyTypes {
     ID = 1,
     NAME = 2,
-    TEXT = 3
+    TEXT = 3,
 }
 
 enum IndexTypes {
     BOOK_ID = 2,
     CHAPTER_ID = 3,
-    VERSE_ID = 4
+    VERSE_ID = 4,
 }
 
 describe('e2e ', function () {
-
-    test("full bible, 7MB json, no index, load and navigate", async () => {
-
-        const stream = await getStream('/bibleapi/bibleapi-bibles-json/master/kjv.json')
+    test('full bible, 7MB json, no index, load and navigate', async () => {
+        const stream = await getStream(
+            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+        )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
 
@@ -56,7 +64,13 @@ describe('e2e ', function () {
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const rootStore: RootStore = emptyRootStore()
 
-        const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+        }).g()
 
         const tx = await g.tx()
 
@@ -69,7 +83,8 @@ describe('e2e ', function () {
         for (const line of lines) {
             const entry = JSON.parse(line)
             if (book === undefined || book_id !== entry.book_id) {
-                book = await tx.addV(ObjectTypes.BOOK)
+                book = await tx
+                    .addV(ObjectTypes.BOOK)
                     .property(KeyTypes.ID, entry.book_id, PropTypes.ANY)
                     .property(KeyTypes.NAME, entry.book_name, PropTypes.ANY)
                     .next()
@@ -77,14 +92,16 @@ describe('e2e ', function () {
                 await tx.addE(RlshpTypes.book).from(bible).to(book).next()
             }
             if (chapter === undefined || chapter_id !== entry.chapter) {
-                chapter = await tx.addV(ObjectTypes.CHAPTER)
+                chapter = await tx
+                    .addV(ObjectTypes.CHAPTER)
                     .property(KeyTypes.ID, entry.chapter, PropTypes.ANY)
                     .next()
                 chapter_id = entry.chapter
                 await tx.addE(RlshpTypes.chapter).from(book).to(chapter).next()
             }
             if (verse === undefined || verse_id !== entry.verse) {
-                verse = await tx.addV(ObjectTypes.VERSE)
+                verse = await tx
+                    .addV(ObjectTypes.VERSE)
                     .property(KeyTypes.ID, entry.verse, PropTypes.ANY)
                     .property(KeyTypes.TEXT, entry.text, PropTypes.ANY)
                     .next()
@@ -95,7 +112,13 @@ describe('e2e ', function () {
 
         const { root, index, blocks } = await tx.commit()
 
-        const g2: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+        const g2: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+        }).g()
 
         blockStore.resetReads()
 
@@ -105,7 +128,10 @@ describe('e2e ', function () {
 
         console.log(`Quick scan reads ${readsFirst}`)
 
-        assert.equal(first, 'In the beginning God created the heaven and the earth.')
+        assert.equal(
+            first,
+            'In the beginning God created the heaven and the earth.'
+        )
 
         blockStore.resetReads()
 
@@ -115,16 +141,20 @@ describe('e2e ', function () {
 
         console.log(`Full scan reads ${readsLast}`)
 
-        assert.equal(last, 'The grace of our Lord Jesus Christ be with you all. Amen.')
+        assert.equal(
+            last,
+            'The grace of our Lord Jesus Christ be with you all. Amen.'
+        )
 
         console.log(`BlockStore total size = ${blockStore.size()}`)
 
         console.log(`Root ${root.toString()}`)
     })
 
-    test("full bible, 7MB json, KeyTypes.ID indexed, load and navigate", async () => {
-
-        const stream = await getStream('/bibleapi/bibleapi-bibles-json/master/kjv.json')
+    test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {
+        const stream = await getStream(
+            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+        )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
 
@@ -134,7 +164,14 @@ describe('e2e ', function () {
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const rootStore: RootStore = emptyRootStore()
         const indexStore = indexStoreFactory(blockStore)
-        const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore, indexStore }).g()
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+            indexStore,
+        }).g()
 
         const tx = await g.tx()
 
@@ -151,7 +188,8 @@ describe('e2e ', function () {
         for (const line of lines) {
             const entry = JSON.parse(line)
             if (book === undefined || book_id !== entry.book_id) {
-                book = await tx.addV(ObjectTypes.BOOK)
+                book = await tx
+                    .addV(ObjectTypes.BOOK)
                     .property(KeyTypes.ID, entry.book_id, PropTypes.ANY)
                     .property(KeyTypes.NAME, entry.book_name, PropTypes.ANY)
                     .next()
@@ -160,7 +198,8 @@ describe('e2e ', function () {
                 books.push(book)
             }
             if (chapter === undefined || chapter_id !== entry.chapter) {
-                chapter = await tx.addV(ObjectTypes.CHAPTER)
+                chapter = await tx
+                    .addV(ObjectTypes.CHAPTER)
                     .property(KeyTypes.ID, entry.chapter, PropTypes.ANY)
                     .next()
                 chapter_id = entry.chapter
@@ -168,7 +207,8 @@ describe('e2e ', function () {
                 chapters.push(chapter)
             }
             if (verse === undefined || verse_id !== entry.verse) {
-                verse = await tx.addV(ObjectTypes.VERSE)
+                verse = await tx
+                    .addV(ObjectTypes.VERSE)
                     .property(KeyTypes.ID, entry.verse, PropTypes.ANY)
                     .property(KeyTypes.TEXT, entry.text, PropTypes.ANY)
                     .next()
@@ -190,7 +230,14 @@ describe('e2e ', function () {
 
         const { root, index, blocks } = await tx.commit()
 
-        const g2: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore, indexStore }).g()
+        const g2: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+            indexStore,
+        }).g()
 
         blockStore.resetReads()
 
@@ -200,7 +247,10 @@ describe('e2e ', function () {
 
         console.log(`Indexed reads first ${readsFirst}`)
 
-        assert.equal(first, 'In the beginning God created the heaven and the earth.')
+        assert.equal(
+            first,
+            'In the beginning God created the heaven and the earth.'
+        )
 
         blockStore.resetReads()
 
@@ -210,7 +260,10 @@ describe('e2e ', function () {
 
         console.log(`Indexed reads last ${readsLast}`)
 
-        assert.equal(last, 'The grace of our Lord Jesus Christ be with you all. Amen.')
+        assert.equal(
+            last,
+            'The grace of our Lord Jesus Christ be with you all. Amen.'
+        )
 
         console.log(`BlockStore total size = ${blockStore.size()}`)
 
@@ -218,14 +271,24 @@ describe('e2e ', function () {
     })
 })
 
-async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, chapter: number, verse: number): Promise<string> {
+async function queryVerse(
+    g: ProtoGremlin,
+    rootOffset: VertexRef,
+    book: string,
+    chapter: number,
+    verse: number
+): Promise<string> {
     const vr = []
     const startTime = new Date().getTime()
-    for await (const result of g.V([rootOffset])
+    for await (const result of g
+        .V([rootOffset])
         .out(RlshpTypes.book)
         .has(ObjectTypes.BOOK, { keyType: KeyTypes.ID, operation: eq(book) })
         .out(RlshpTypes.chapter)
-        .has(ObjectTypes.CHAPTER, { keyType: KeyTypes.ID, operation: eq(chapter) })
+        .has(ObjectTypes.CHAPTER, {
+            keyType: KeyTypes.ID,
+            operation: eq(chapter),
+        })
         .out(RlshpTypes.verse)
         .has(ObjectTypes.VERSE, { keyType: KeyTypes.ID, operation: eq(verse) })
         .values(KeyTypes.TEXT)
@@ -238,4 +301,3 @@ async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, 
 
     return vr[0].value
 }
-

@@ -1,15 +1,27 @@
 import { protoGremlinFactory, ProtoGremlin } from './api/proto-gremlin'
 
 import bent from 'bent'
-import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
+import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from './chunking'
-import { BlockStore, MemoryBlockStore, memoryBlockStoreFactory } from './block-store'
-import { LinkCodec, linkCodecFactory, BlockCodec, blockCodecFactory } from './codecs'
+import {
+    BlockStore,
+    MemoryBlockStore,
+    memoryBlockStoreFactory,
+} from './block-store'
+import {
+    LinkCodec,
+    linkCodecFactory,
+    BlockCodec,
+    blockCodecFactory,
+} from './codecs'
 import { RootStore, emptyRootStore, initRootStore } from './root-store'
 
 import { create as ipfsApi } from 'ipfs-http-client'
 import { blockStore as ipfsBlockStore } from '@dstanesc/ipfs-block-store'
-import { blockStore as httpBlockStore, resolvers } from '@dstanesc/http-block-store'
+import {
+    blockStore as httpBlockStore,
+    resolvers,
+} from '@dstanesc/http-block-store'
 
 import { eq } from './ops'
 import { CID } from 'multiformats/cid'
@@ -28,24 +40,23 @@ enum ObjectTypes {
 enum RlshpTypes {
     book = 1,
     chapter = 2,
-    verse = 3
-
+    verse = 3,
 }
 
 enum PropTypes {
-    ANY = 1
+    ANY = 1,
 }
 
 enum KeyTypes {
     ID = 1,
     NAME = 2,
-    TEXT = 3
+    TEXT = 3,
 }
 
 enum IndexTypes {
     BOOK_ID = 2,
     CHAPTER_ID = 3,
-    VERSE_ID = 4
+    VERSE_ID = 4,
 }
 
 const stream = await getStream('/bibleapi/bibleapi-bibles-json/master/kjv.json')
@@ -61,7 +72,13 @@ async function publish() {
     const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
     const rootStore: RootStore = emptyRootStore()
 
-    const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+    const g: ProtoGremlin = protoGremlinFactory({
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+        rootStore,
+    }).g()
 
     const tx = await g.tx()
 
@@ -74,7 +91,8 @@ async function publish() {
     for (const line of lines) {
         const entry = JSON.parse(line)
         if (book === undefined || book_id !== entry.book_id) {
-            book = await tx.addV(ObjectTypes.BOOK)
+            book = await tx
+                .addV(ObjectTypes.BOOK)
                 .property(KeyTypes.ID, entry.book_id, PropTypes.ANY)
                 .property(KeyTypes.NAME, entry.book_name, PropTypes.ANY)
                 .next()
@@ -82,14 +100,16 @@ async function publish() {
             await tx.addE(RlshpTypes.book).from(bible).to(book).next()
         }
         if (chapter === undefined || chapter_id !== entry.chapter) {
-            chapter = await tx.addV(ObjectTypes.CHAPTER)
+            chapter = await tx
+                .addV(ObjectTypes.CHAPTER)
                 .property(KeyTypes.ID, entry.chapter, PropTypes.ANY)
                 .next()
             chapter_id = entry.chapter
             await tx.addE(RlshpTypes.chapter).from(book).to(chapter).next()
         }
         if (verse === undefined || verse_id !== entry.verse) {
-            verse = await tx.addV(ObjectTypes.VERSE)
+            verse = await tx
+                .addV(ObjectTypes.VERSE)
                 .property(KeyTypes.ID, entry.verse, PropTypes.ANY)
                 .property(KeyTypes.TEXT, entry.text, PropTypes.ANY)
                 .next()
@@ -104,7 +124,9 @@ async function publish() {
 }
 
 async function query() {
-    const cid = CID.parse('bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4')
+    const cid = CID.parse(
+        'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+    )
     const cache = {}
     const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
@@ -113,20 +135,36 @@ async function query() {
     const blockStore = httpBlockStore({ cache })
     const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
     const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
-    const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+    const g: ProtoGremlin = protoGremlinFactory({
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+        rootStore,
+    }).g()
     const { result, time } = await queryVerse(g, 0, 'Gen', 1, 1)
     console.log(result)
     console.log(time)
 }
 
-async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, chapter: number, verse: number): Promise<{ result: string, time: number }> {
+async function queryVerse(
+    g: ProtoGremlin,
+    rootOffset: VertexRef,
+    book: string,
+    chapter: number,
+    verse: number
+): Promise<{ result: string; time: number }> {
     const vr = []
     const startTime = new Date().getTime()
-    for await (const result of g.V([rootOffset])
+    for await (const result of g
+        .V([rootOffset])
         .out(RlshpTypes.book)
         .has(ObjectTypes.BOOK, { keyType: KeyTypes.ID, operation: eq(book) })
         .out(RlshpTypes.chapter)
-        .has(ObjectTypes.CHAPTER, { keyType: KeyTypes.ID, operation: eq(chapter) })
+        .has(ObjectTypes.CHAPTER, {
+            keyType: KeyTypes.ID,
+            operation: eq(chapter),
+        })
         .out(RlshpTypes.verse)
         .has(ObjectTypes.VERSE, { keyType: KeyTypes.ID, operation: eq(verse) })
         .values(KeyTypes.TEXT)
@@ -140,4 +178,4 @@ async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, 
     return { result: vr[0].value, time }
 }
 
-await query()
+await publish()

@@ -1,21 +1,23 @@
-import { linkCodecFactory, blockCodecFactory, BlockCodec, LinkCodec } from "../codecs"
-import { graphStore } from "../graph-store"
-import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
-import { chunkerFactory } from "../chunking"
-import { Graph } from "../graph"
-import { BlockStore, memoryBlockStoreFactory } from "../block-store"
-import { RootStore, emptyRootStore } from "../root-store"
+import {
+    linkCodecFactory,
+    blockCodecFactory,
+    BlockCodec,
+    LinkCodec,
+} from '../codecs'
+import { graphStore } from '../graph-store'
+import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
+import { chunkerFactory } from '../chunking'
+import { Graph } from '../graph'
+import { BlockStore, memoryBlockStoreFactory } from '../block-store'
+import { RootStore, emptyRootStore } from '../root-store'
 
 import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
-import { navigateVertices, PathElemType, RequestBuilder } from "../navigate"
-import { Status } from "../types"
-
+import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
+import { Status } from '../types'
 
 describe('Minimal, schema-less creation and navigation deterministic root', function () {
-
-    test("internal api creation", async () => {
-
+    test('internal api creation', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
@@ -35,28 +37,40 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         await tx.addEdge(v1, v2)
         await tx.addEdge(v1, v3)
 
-        await tx.addVertexProp(v2, 1, { hello: "v2" })
-        await tx.addVertexProp(v2, 1, { hello: "v3" })
+        await tx.addVertexProp(v2, 1, { hello: 'v2' })
+        await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
         const { root } = await tx.commit()
 
-        assert.equal('bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra', root.toString())
+        assert.equal(
+            'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
+            root.toString()
+        )
     })
 
-    test("proto-gremlin api creation", async () => {
-
+    test('proto-gremlin api creation', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const rootStore: RootStore = emptyRootStore()
 
-        const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+        }).g()
 
         const tx = await g.tx()
 
         const v1 = await tx.addV().next()
-        const v2 = await tx.addV().property(1, { hello: "v2" }).property(1, { hello: "v3" }).next()
+        const v2 = await tx
+            .addV()
+            .property(1, { hello: 'v2' })
+            .property(1, { hello: 'v3' })
+            .next()
         const v3 = await tx.addV().next()
 
         const e1 = await tx.addE().from(v1).to(v2).next()
@@ -64,11 +78,13 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
 
         const { root } = await tx.commit()
 
-        assert.equal('bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra', root.toString())
+        assert.equal(
+            'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
+            root.toString()
+        )
     })
 
-    test("internal api navigate", async () => {
-
+    test('internal api navigate', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
@@ -86,10 +102,10 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const v3 = tx.addVertex()
 
         const e1 = await tx.addEdge(v1, v2)
-        const e2 =await tx.addEdge(v1, v3)
+        const e2 = await tx.addEdge(v1, v3)
 
-        const p1 = await tx.addVertexProp(v2, 1, { hello: "v2" })
-        const p2 = await tx.addVertexProp(v2, 1, { hello: "v3" })
+        const p1 = await tx.addVertexProp(v2, 1, { hello: 'v2' })
+        const p2 = await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
         await tx.commit()
 
@@ -117,20 +133,29 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         assert.equal(e2.status, Status.CREATED)
     })
 
-    test("proto-gremlin api navigate", async () => {
-
+    test('proto-gremlin api navigate', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const rootStore: RootStore = emptyRootStore()
 
-        const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+            rootStore,
+        }).g()
 
         const tx = await g.tx()
 
         const v1 = await tx.addV().next()
-        const v2 = await tx.addV().property(1, { hello: "v2" }).property(1, { hello: "v3" }).next()
+        const v2 = await tx
+            .addV()
+            .property(1, { hello: 'v2' })
+            .property(1, { hello: 'v3' })
+            .next()
         const v3 = await tx.addV().next()
 
         const e1 = await tx.addE().from(v1).to(v2).next()
@@ -149,5 +174,4 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         assert.equal(vr[0].status, Status.CREATED)
         assert.equal(vr[1].status, Status.CREATED)
     })
-
 })

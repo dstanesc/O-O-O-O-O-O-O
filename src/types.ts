@@ -1,6 +1,3 @@
-
-
-
 interface Part {
     status: Status
     offset: Offset
@@ -40,45 +37,32 @@ enum Status {
     UNKNOWN = 0x0,
     CREATED = 0x1,
     UPDATED = 0x4,
-    DELETED = 0x8
+    DELETED = 0x8,
 }
 
-type Offset = number & {
-}
+type Offset = number & {}
 
-type Ref = Offset & {
-}
+type Ref = Offset & {}
 
-type VertexRef = Ref & {
-}
+type VertexRef = Ref & {}
 
-type EdgeRef = Ref & {
-}
+type EdgeRef = Ref & {}
 
-type PropRef = Ref & {
-}
+type PropRef = Ref & {}
 
-type IndexRef = Ref & {
-}
+type IndexRef = Ref & {}
 
-type Type = number & {
-}
+type Type = number & {}
 
-type VertexType = Type & {
-}
+type VertexType = Type & {}
 
-type EdgeType = Type & {
-}
+type EdgeType = Type & {}
 
-type PropType = Type & {
-}
+type PropType = Type & {}
 
-type KeyType = Type & {
-}
+type KeyType = Type & {}
 
-type IndexType = Type & {
-}
-
+type IndexType = Type & {}
 
 type ShortString<MaxBytes> = string & {
     shield: never
@@ -91,7 +75,7 @@ type Link = {
 type PropValue = any
 
 type IndexedValue = {
-    value: any, 
+    value: any
     ref: Ref
 }
 
@@ -101,20 +85,20 @@ type Block = {
 }
 
 type RootStruct = {
-    vertexRoot: Link,
-    vertexOffset: number,
-    edgeRoot: Link,
-    edgeOffset: number,
-    propRoot: Link,
-    propOffset: number,
-    indexRoot: Link,
-    indexOffset: number,
+    vertexRoot: Link
+    vertexOffset: number
+    edgeRoot: Link
+    edgeOffset: number
+    propRoot: Link
+    propOffset: number
+    indexRoot: Link
+    indexOffset: number
 }
 
 type RootIndex = RootStruct & {
-    vertexIndex: any,
-    edgeIndex: any,
-    propIndex: any,
+    vertexIndex: any
+    edgeIndex: any
+    propIndex: any
     indexIndex: any
 }
 
@@ -129,9 +113,29 @@ type RootIndex = RootStruct & {
 // }
 
 export {
-    Vertex, Edge, Prop, Part, Index, Offset,
-    Ref, VertexRef, EdgeRef, PropRef, IndexRef,
-    Status, Type, VertexType, EdgeType, PropType,
-    KeyType, IndexType, PropValue, IndexedValue,
-    ShortString, Link, Block, RootStruct, RootIndex,
+    Vertex,
+    Edge,
+    Prop,
+    Part,
+    Index,
+    Offset,
+    Ref,
+    VertexRef,
+    EdgeRef,
+    PropRef,
+    IndexRef,
+    Status,
+    Type,
+    VertexType,
+    EdgeType,
+    PropType,
+    KeyType,
+    IndexType,
+    PropValue,
+    IndexedValue,
+    ShortString,
+    Link,
+    Block,
+    RootStruct,
+    RootIndex,
 }

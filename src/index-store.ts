@@ -1,4 +1,4 @@
-import { IndexedValue, Link } from "./types";
+import { IndexedValue, Link } from './types'
 
 interface IndexStore {
     indexCreate: (values: IndexedValue[]) => Promise<Link>

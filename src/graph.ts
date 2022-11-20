@@ -1,9 +1,25 @@
 import {
-    Vertex, Edge, Prop, Offset,
-    VertexRef, EdgeRef, PropRef,
-    VertexType, EdgeType, PropType,
-    KeyType, PropValue,
-    Link, Block, RootIndex, IndexedValue, Index, IndexRef, IndexType, Status, Part
+    Vertex,
+    Edge,
+    Prop,
+    Offset,
+    VertexRef,
+    EdgeRef,
+    PropRef,
+    VertexType,
+    EdgeType,
+    PropType,
+    KeyType,
+    PropValue,
+    Link,
+    Block,
+    RootIndex,
+    IndexedValue,
+    Index,
+    IndexRef,
+    IndexType,
+    Status,
+    Part,
 } from './types'
 
 import { RootStore } from './root-store'
@@ -19,11 +35,17 @@ interface ElementAccessor {
     getProp: (ref: PropRef) => Promise<Prop>
 }
 
-async function* edgesOutgoing(vertex: Vertex, accessor: ElementAccessor): AsyncGenerator<Edge, void, void> {
+async function* edgesOutgoing(
+    vertex: Vertex,
+    accessor: ElementAccessor
+): AsyncGenerator<Edge, void, void> {
     yield* edgeSourceNext(vertex.nextEdge, accessor)
 }
 
-async function* edgeSourceNext(ref: EdgeRef, accessor: ElementAccessor): AsyncGenerator<Edge, void, void> {
+async function* edgeSourceNext(
+    ref: EdgeRef,
+    accessor: ElementAccessor
+): AsyncGenerator<Edge, void, void> {
     if (ref !== undefined) {
         const edge = await accessor.getEdge(ref)
         yield edge
@@ -31,7 +53,10 @@ async function* edgeSourceNext(ref: EdgeRef, accessor: ElementAccessor): AsyncGe
     }
 }
 
-async function* propsNext(ref: PropRef, accessor: ElementAccessor): AsyncGenerator<Prop, void, void> {
+async function* propsNext(
+    ref: PropRef,
+    accessor: ElementAccessor
+): AsyncGenerator<Prop, void, void> {
     if (ref !== undefined) {
         const prop = await accessor.getProp(ref)
         yield prop
@@ -39,7 +64,9 @@ async function* propsNext(ref: PropRef, accessor: ElementAccessor): AsyncGenerat
     }
 }
 
-function incomingEdgesVisitor(incomingEdges: Map<VertexRef, Set<EdgeRef>>): TraversalVisitor {
+function incomingEdgesVisitor(
+    incomingEdges: Map<VertexRef, Set<EdgeRef>>
+): TraversalVisitor {
     const endEdge = async (edge: Edge) => {
         const edgeOffset = edge.offset
         const targetOffset = edge.target
@@ -56,52 +83,192 @@ function incomingEdgesVisitor(incomingEdges: Map<VertexRef, Set<EdgeRef>>): Trav
 }
 
 class Graph implements ElementAccessor {
-
     vertices: Map<number, Vertex>
     edges: Map<number, Edge>
     props: Map<number, Prop>
     indices: Map<number, Index>
 
-    rootSet: ({ root, index }: { root: Link, index: RootIndex }) => Promise<void>
-    rootGet: () => Promise<{ root: Link, index: RootIndex }>
-    vertexGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Vertex>
-    edgeGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Edge>
-    propGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Prop>
-    indexGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Index>
-    offsetsGet: ({ root, index }: { root: Link, index: RootIndex }) => Promise<{ vertexOffset: Offset, edgeOffset: Offset, propOffset: Offset, indexOffset: Offset }>
-    verticesAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Vertex[]>
-    edgesAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Edge[]>
-    propsAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Prop[]>
-    commit: ({ root, index }: { root: Link, index: RootIndex },
-        { vertices, edges, props }: {
-            vertices: { added: Map<number, Vertex>, updated: Map<number, Vertex> },
-            edges: { added: Map<number, Edge>, updated: Map<number, Edge> },
-            props: { added: Map<number, Prop>, updated: Map<number, Prop> }
-            indices: { added: Map<number, Index>, updated: Map<number, Index> }
-        }) => Promise<{ root: Link, index: RootIndex, blocks: Block[] }>
+    rootSet: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<void>
+    rootGet: () => Promise<{ root: Link; index: RootIndex }>
+    vertexGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Vertex>
+    edgeGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Edge>
+    propGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Prop>
+    indexGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Index>
+    offsetsGet: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<{
+        vertexOffset: Offset
+        edgeOffset: Offset
+        propOffset: Offset
+        indexOffset: Offset
+    }>
+    verticesAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Vertex[]>
+    edgesAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Edge[]>
+    propsAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Prop[]>
+    commit: (
+        { root, index }: { root: Link; index: RootIndex },
+        {
+            vertices,
+            edges,
+            props,
+        }: {
+            vertices: {
+                added: Map<number, Vertex>
+                updated: Map<number, Vertex>
+            }
+            edges: { added: Map<number, Edge>; updated: Map<number, Edge> }
+            props: { added: Map<number, Prop>; updated: Map<number, Prop> }
+            indices: { added: Map<number, Index>; updated: Map<number, Index> }
+        }
+    ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
 
     indexCreate: (values: IndexedValue[]) => Promise<Link>
     indexSearch: (link: Link, value: any) => Promise<IndexedValue>
 
     constructor(
-        { rootSet, rootGet }: { rootSet: ({ root, index }: { root: Link, index: RootIndex }) => Promise<void>, rootGet: () => Promise<{ root: Link, index: RootIndex }> },
-        { vertexGet, edgeGet, propGet, indexGet, offsetsGet, verticesAll, edgesAll, propsAll, commit }: {
-            vertexGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Vertex>,
-            edgeGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Edge>,
-            propGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Prop>,
-            indexGet: ({ root, index }: { root: Link, index: RootIndex }, offset: number) => Promise<Index>
-            offsetsGet: ({ root, index }: { root: Link, index: RootIndex }) => Promise<{ vertexOffset: Offset, edgeOffset: Offset, propOffset: Offset, indexOffset: Offset }>,
-            verticesAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Vertex[]>,
-            edgesAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Edge[]>,
-            propsAll: ({ root, index }: { root: Link, index: RootIndex }) => Promise<Prop[]>,
-            commit: ({ root, index }: { root: Link, index: RootIndex },
-                { vertices, edges, props }: {
-                    vertices: { added: Map<number, Vertex>, updated: Map<number, Vertex> },
-                    edges: { added: Map<number, Edge>, updated: Map<number, Edge> },
-                    props: { added: Map<number, Prop>, updated: Map<number, Prop> }
-                    indices: { added: Map<number, Index>, updated: Map<number, Index> }
-                }) => Promise<{ root: Link, index: RootIndex, blocks: Block[] }>
-        }, { indexCreate, indexSearch }: IndexStore = { indexCreate: undefined, indexSearch: undefined }
+        {
+            rootSet,
+            rootGet,
+        }: {
+            rootSet: ({
+                root,
+                index,
+            }: {
+                root: Link
+                index: RootIndex
+            }) => Promise<void>
+            rootGet: () => Promise<{ root: Link; index: RootIndex }>
+        },
+        {
+            vertexGet,
+            edgeGet,
+            propGet,
+            indexGet,
+            offsetsGet,
+            verticesAll,
+            edgesAll,
+            propsAll,
+            commit,
+        }: {
+            vertexGet: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number
+            ) => Promise<Vertex>
+            edgeGet: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number
+            ) => Promise<Edge>
+            propGet: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number
+            ) => Promise<Prop>
+            indexGet: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number
+            ) => Promise<Index>
+            offsetsGet: ({
+                root,
+                index,
+            }: {
+                root: Link
+                index: RootIndex
+            }) => Promise<{
+                vertexOffset: Offset
+                edgeOffset: Offset
+                propOffset: Offset
+                indexOffset: Offset
+            }>
+            verticesAll: ({
+                root,
+                index,
+            }: {
+                root: Link
+                index: RootIndex
+            }) => Promise<Vertex[]>
+            edgesAll: ({
+                root,
+                index,
+            }: {
+                root: Link
+                index: RootIndex
+            }) => Promise<Edge[]>
+            propsAll: ({
+                root,
+                index,
+            }: {
+                root: Link
+                index: RootIndex
+            }) => Promise<Prop[]>
+            commit: (
+                { root, index }: { root: Link; index: RootIndex },
+                {
+                    vertices,
+                    edges,
+                    props,
+                }: {
+                    vertices: {
+                        added: Map<number, Vertex>
+                        updated: Map<number, Vertex>
+                    }
+                    edges: {
+                        added: Map<number, Edge>
+                        updated: Map<number, Edge>
+                    }
+                    props: {
+                        added: Map<number, Prop>
+                        updated: Map<number, Prop>
+                    }
+                    indices: {
+                        added: Map<number, Index>
+                        updated: Map<number, Index>
+                    }
+                }
+            ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+        },
+        { indexCreate, indexSearch }: IndexStore = {
+            indexCreate: undefined,
+            indexSearch: undefined,
+        }
     ) {
         this.vertices = new Map()
         this.edges = new Map()
@@ -170,21 +337,33 @@ class Graph implements ElementAccessor {
         return await this.propsAll(await this.rootGet())
     }
 
-    async matchAnyEdgeProp(edge: Edge, predicate: PropPredicate): Promise<boolean> {
+    async matchAnyEdgeProp(
+        edge: Edge,
+        predicate: PropPredicate
+    ): Promise<boolean> {
         if (edge.nextProp !== undefined)
             return await this.matchNextProp(edge.nextProp, predicate)
         else return false
     }
 
-    async matchAnyVertexProp(vertex: Vertex, predicate: PropPredicate): Promise<boolean> {
+    async matchAnyVertexProp(
+        vertex: Vertex,
+        predicate: PropPredicate
+    ): Promise<boolean> {
         if (vertex.nextProp !== undefined)
             return await this.matchNextProp(vertex.nextProp, predicate)
         else return false
     }
 
-    async matchNextProp(ref: PropRef, predicate: PropPredicate): Promise<boolean> {
+    async matchNextProp(
+        ref: PropRef,
+        predicate: PropPredicate
+    ): Promise<boolean> {
         let prop: Prop = await this.getProp(ref)
-        if (predicate.keyType === prop.key && predicate.operation.predicate(prop.value)) {
+        if (
+            predicate.keyType === prop.key &&
+            predicate.operation.predicate(prop.value)
+        ) {
             return true
         } else if (prop.nextProp !== undefined) {
             return await this.matchNextProp(prop.nextProp, predicate)
@@ -196,18 +375,26 @@ class Graph implements ElementAccessor {
         return await this.matchNextIndex(vertex.nextIndex, key)
     }
 
-    async matchNextIndex(ref: IndexRef, key: KeyType): Promise<Index | undefined> {
+    async matchNextIndex(
+        ref: IndexRef,
+        key: KeyType
+    ): Promise<Index | undefined> {
         if (ref !== undefined) {
             const index: Index = await this.getIndex(ref)
-            if (index.key === key)
-                return index
+            if (index.key === key) return index
             else return await this.matchNextIndex(index.nextIndex, key)
         } else return undefined
     }
 
-    async searchIndex(index: Index, predicate: PropPredicate): Promise<IndexedValue> {
+    async searchIndex(
+        index: Index,
+        predicate: PropPredicate
+    ): Promise<IndexedValue> {
         const { keyType, operation } = predicate
-        const indexedValue: IndexedValue = await this.indexSearch(index.value, operation.operand)
+        const indexedValue: IndexedValue = await this.indexSearch(
+            index.value,
+            operation.operand
+        )
         return indexedValue
     }
 
@@ -217,13 +404,12 @@ class Graph implements ElementAccessor {
 }
 
 class Tx implements ElementAccessor {
-
     graph: Graph
 
-    vertices: { added: Map<number, Vertex>, updated: Map<number, Vertex> }
-    edges: { added: Map<number, Edge>, updated: Map<number, Edge> }
-    props: { added: Map<number, Prop>, updated: Map<number, Prop> }
-    indices: { added: Map<number, Index>, updated: Map<number, Index> }
+    vertices: { added: Map<number, Vertex>; updated: Map<number, Vertex> }
+    edges: { added: Map<number, Edge>; updated: Map<number, Edge> }
+    props: { added: Map<number, Prop>; updated: Map<number, Prop> }
+    indices: { added: Map<number, Index>; updated: Map<number, Index> }
 
     vertexOffsetInit: number
     edgeOffsetInit: number
@@ -245,7 +431,15 @@ class Tx implements ElementAccessor {
         this.props = { added: new Map(), updated: new Map() }
         this.indices = { added: new Map(), updated: new Map() }
         const { root, index } = await this.graph.rootGet()
-        const { vertexOffset, edgeOffset, propOffset, indexOffset } = root !== undefined ? await this.graph.offsetsGet({ root, index }) : { vertexOffset: 0, edgeOffset: 0, propOffset: 0, indexOffset: 0 }
+        const { vertexOffset, edgeOffset, propOffset, indexOffset } =
+            root !== undefined
+                ? await this.graph.offsetsGet({ root, index })
+                : {
+                      vertexOffset: 0,
+                      edgeOffset: 0,
+                      propOffset: 0,
+                      indexOffset: 0,
+                  }
         this.vertexOffsetInit = vertexOffset
         this.edgeOffsetInit = edgeOffset
         this.propOffsetInit = propOffset
@@ -256,7 +450,6 @@ class Tx implements ElementAccessor {
         this.indexOffset = indexOffset
         return this
     }
-
 
     nextVertexOffset(): Offset {
         const currentOffset = this.vertexOffset
@@ -287,7 +480,8 @@ class Tx implements ElementAccessor {
         if (ref >= this.vertexOffsetInit) {
             vertex = this.vertices.added.get(ref)
             if (vertex === undefined) vertex = this.vertices.updated.get(ref)
-            if (vertex === undefined) throw new Error(`invalid vertex ref ${ref}`)
+            if (vertex === undefined)
+                throw new Error(`invalid vertex ref ${ref}`)
         } else vertex = await this.graph.getVertex(ref)
         return vertex
     }
@@ -349,17 +543,24 @@ class Tx implements ElementAccessor {
     addVertex(type?: VertexType): Vertex {
         const offset = this.nextVertexOffset()
         const vertex: Vertex = { status: Status.CREATED, offset }
-        if (type !== undefined)
-            vertex.type = type
+        if (type !== undefined) vertex.type = type
         this.vertices.added.set(offset, vertex)
         return vertex
     }
 
-    async addEdge(source: Vertex, target: Vertex, type?: EdgeType): Promise<Edge> {
+    async addEdge(
+        source: Vertex,
+        target: Vertex,
+        type?: EdgeType
+    ): Promise<Edge> {
         const offset = this.nextEdgeOffset()
-        const edge: Edge = { status: Status.CREATED, offset, source: source.offset, target: target.offset }
-        if (type !== undefined)
-            edge.type = type
+        const edge: Edge = {
+            status: Status.CREATED,
+            offset,
+            source: source.offset,
+            target: target.offset,
+        }
+        if (type !== undefined) edge.type = type
         this.edges.added.set(edge.offset, edge)
         if (source.nextEdge !== undefined) {
             const nextEdge: Edge = await this.getEdge(source.nextEdge)
@@ -382,11 +583,15 @@ class Tx implements ElementAccessor {
         }
     }
 
-    async addVertexProp(vertex: Vertex, key: KeyType, value: PropValue, type?: PropType): Promise<Prop> {
+    async addVertexProp(
+        vertex: Vertex,
+        key: KeyType,
+        value: PropValue,
+        type?: PropType
+    ): Promise<Prop> {
         const offset = this.nextPropOffset()
         const prop: Prop = { status: Status.CREATED, offset, key, value }
-        if (type !== undefined)
-            prop.type = type
+        if (type !== undefined) prop.type = type
         this.props.added.set(prop.offset, prop)
         if (vertex.nextProp !== undefined) {
             const nextProp: Prop = await this.getProp(vertex.nextProp)
@@ -409,11 +614,15 @@ class Tx implements ElementAccessor {
         }
     }
 
-    async addVertexIndex(vertex: Vertex, key: KeyType, value: Link, type?: IndexType): Promise<Index> {
+    async addVertexIndex(
+        vertex: Vertex,
+        key: KeyType,
+        value: Link,
+        type?: IndexType
+    ): Promise<Index> {
         const offset = this.nextIndexOffset()
         const index: Index = { status: Status.CREATED, offset, key, value }
-        if (type !== undefined)
-            index.type = type
+        if (type !== undefined) index.type = type
         this.indices.added.set(index.offset, index)
         if (vertex.nextIndex !== undefined)
             await this.appendVertexIndex(vertex.nextIndex, index)
@@ -424,11 +633,15 @@ class Tx implements ElementAccessor {
         return index
     }
 
-    async addEdgeProp(edge: Edge, key: KeyType, value: PropValue, type?: PropType): Promise<Prop> {
+    async addEdgeProp(
+        edge: Edge,
+        key: KeyType,
+        value: PropValue,
+        type?: PropType
+    ): Promise<Prop> {
         const offset = this.nextPropOffset()
         const prop: Prop = { status: Status.CREATED, offset, key, value }
-        if (type !== undefined)
-            prop.type = type
+        if (type !== undefined) prop.type = type
         this.props.added.set(prop.offset, prop)
         if (edge.nextProp !== undefined) {
             const nextProp: Prop = await this.getProp(edge.nextProp)
@@ -457,7 +670,8 @@ class Tx implements ElementAccessor {
     }
 
     async appendEdge(currentEdge: Edge, newEdge: Edge): Promise<void> {
-        if (currentEdge.offset === newEdge.offset) throw new Error(`Invalid edge append. Cannot append to itself`)
+        if (currentEdge.offset === newEdge.offset)
+            throw new Error(`Invalid edge append. Cannot append to itself`)
         if (currentEdge.sourceNext !== undefined) {
             const sourceNext: Edge = await this.getEdge(currentEdge.sourceNext)
             await this.appendEdge(sourceNext, newEdge)
@@ -474,7 +688,8 @@ class Tx implements ElementAccessor {
     }
 
     async appendProp(currentProp: Prop, newProp: Prop): Promise<void> {
-        if (currentProp.offset === newProp.offset) throw new Error(`Invalid prop append. Cannot append to itself`)
+        if (currentProp.offset === newProp.offset)
+            throw new Error(`Invalid prop append. Cannot append to itself`)
         if (currentProp.nextProp !== undefined) {
             const nextProp: Prop = await this.getProp(currentProp.nextProp)
             await this.appendProp(nextProp, newProp)
@@ -484,9 +699,13 @@ class Tx implements ElementAccessor {
         }
     }
 
-    async appendVertexIndex(currentRef: IndexRef, newIndex: Index): Promise<void> {
+    async appendVertexIndex(
+        currentRef: IndexRef,
+        newIndex: Index
+    ): Promise<void> {
         const currentIndex: Index = await this.getIndex(currentRef)
-        if (currentIndex.offset === newIndex.offset) throw new Error(`Invalid index append. Cannot append to itself`)
+        if (currentIndex.offset === newIndex.offset)
+            throw new Error(`Invalid index append. Cannot append to itself`)
         if (currentIndex.nextIndex !== undefined) {
             await this.appendVertexIndex(currentIndex.nextIndex, newIndex)
         } else {
@@ -495,9 +714,13 @@ class Tx implements ElementAccessor {
         }
     }
 
-
-    async uniqueIndex(outgoingFrom: Vertex, key: KeyType, type?: IndexType): Promise<Index | undefined> {
-        if (this.graph.indexCreate === undefined) throw new Error("Please provide an index store to the graph")
+    async uniqueIndex(
+        outgoingFrom: Vertex,
+        key: KeyType,
+        type?: IndexType
+    ): Promise<Index | undefined> {
+        if (this.graph.indexCreate === undefined)
+            throw new Error('Please provide an index store to the graph')
         const edgesOut = edgesOutgoing(outgoingFrom, this)
         const values: IndexedValue[] = []
         for await (const edge of edgesOut) {
@@ -512,32 +735,66 @@ class Tx implements ElementAccessor {
                 }
             }
         }
-        if (values.length === 0)
-            return undefined
+        if (values.length === 0) return undefined
         else {
             const link: Link = await this.graph.indexCreate(values)
-            const index: Index = await this.addVertexIndex(outgoingFrom, key, link, type)
+            const index: Index = await this.addVertexIndex(
+                outgoingFrom,
+                key,
+                link,
+                type
+            )
             //console.log(`Index create ${JSON.stringify(index)}`)
             return index
         }
     }
 
-    async commit(): Promise<{ root: Link, index: RootIndex, blocks: Block[] }> {
-
-        const verticesNew = new Map([...this.graph.vertices, ...this.vertices.updated, ...this.vertices.added])
-        const edgesNew = new Map([...this.graph.edges, ...this.edges.updated, ...this.edges.added])
-        const propsNew = new Map([...this.graph.props, ...this.props.updated, ...this.props.added])
-        const indicesNew = new Map([...this.graph.indices, ...this.indices.updated, ...this.indices.added])
-        const sourceVertexRefs: Set<VertexRef> = new Set(Array.from(edgesNew.values()).map(edge => edge.source))
-        const targetVertexRefs: Set<VertexRef> = new Set(Array.from(edgesNew.values()).map(edge => edge.target))
-        const editedVertexRefs: Set<VertexRef> = new Set(Array.from(verticesNew.keys()))
-        const impactedVertices = new Set([...sourceVertexRefs, ...targetVertexRefs, ...editedVertexRefs])
+    async commit(): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
+        const verticesNew = new Map([
+            ...this.graph.vertices,
+            ...this.vertices.updated,
+            ...this.vertices.added,
+        ])
+        const edgesNew = new Map([
+            ...this.graph.edges,
+            ...this.edges.updated,
+            ...this.edges.added,
+        ])
+        const propsNew = new Map([
+            ...this.graph.props,
+            ...this.props.updated,
+            ...this.props.added,
+        ])
+        const indicesNew = new Map([
+            ...this.graph.indices,
+            ...this.indices.updated,
+            ...this.indices.added,
+        ])
+        const sourceVertexRefs: Set<VertexRef> = new Set(
+            Array.from(edgesNew.values()).map((edge) => edge.source)
+        )
+        const targetVertexRefs: Set<VertexRef> = new Set(
+            Array.from(edgesNew.values()).map((edge) => edge.target)
+        )
+        const editedVertexRefs: Set<VertexRef> = new Set(
+            Array.from(verticesNew.keys())
+        )
+        const impactedVertices = new Set([
+            ...sourceVertexRefs,
+            ...targetVertexRefs,
+            ...editedVertexRefs,
+        ])
 
         await this.fillTargetLinks(impactedVertices)
 
         const rootBefore = await this.graph.rootGet()
 
-        const { root, index, blocks } = await this.graph.commit(rootBefore, { vertices: this.vertices, edges: this.edges, props: this.props, indices: this.indices })
+        const { root, index, blocks } = await this.graph.commit(rootBefore, {
+            vertices: this.vertices,
+            edges: this.edges,
+            props: this.props,
+            indices: this.indices,
+        })
 
         this.graph.rootSet({ root, index })
 
@@ -549,7 +806,6 @@ class Tx implements ElementAccessor {
         return { root, index, blocks }
     }
 
-
     async fillTargetLinks(refs: Iterable<VertexRef>): Promise<void> {
         const incomingEdges = new Map<VertexRef, Set<EdgeRef>>()
         await traverseVertices(this, refs, incomingEdgesVisitor(incomingEdges))
@@ -559,7 +815,9 @@ class Tx implements ElementAccessor {
                 const outgoingEdges = edgesOutgoing(vertex, this)
                 for await (const outgoingEdge of outgoingEdges) {
                     for (const incomingEdgeRef of incomingRefs.values()) {
-                        const incomingEdge: Edge = await this.getEdge(incomingEdgeRef)
+                        const incomingEdge: Edge = await this.getEdge(
+                            incomingEdgeRef
+                        )
                         outgoingEdge.targetPrev = incomingEdge.offset
                         if (outgoingEdge.offset === vertex.nextEdge) {
                             incomingEdge.targetNext = outgoingEdge.offset
@@ -571,5 +829,4 @@ class Tx implements ElementAccessor {
     }
 }
 
-
-export { Graph, Tx, ElementAccessor } 
+export { Graph, Tx, ElementAccessor }

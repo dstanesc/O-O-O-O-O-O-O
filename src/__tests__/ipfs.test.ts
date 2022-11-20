@@ -1,11 +1,16 @@
 import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import { VertexRef } from '../types'
-import { compute_chunks } from "@dstanesc/wasm-chunking-fastcdc-node"
+import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
 import { BlockStore } from '../block-store'
 import { create as ipfsApi } from 'ipfs-http-client'
 import { blockStore as ipfsBlockStore } from '@dstanesc/ipfs-block-store'
-import { LinkCodec, linkCodecFactory, BlockCodec, blockCodecFactory } from '../codecs'
+import {
+    LinkCodec,
+    linkCodecFactory,
+    BlockCodec,
+    blockCodecFactory,
+} from '../codecs'
 import { RootStore, initRootStore } from '../root-store'
 import { eq } from '../ops'
 import { CID } from 'multiformats/cid'
@@ -22,23 +27,33 @@ enum ObjectTypes {
 enum RlshpTypes {
     book = 1,
     chapter = 2,
-    verse = 3
+    verse = 3,
 }
 
 enum KeyTypes {
     ID = 1,
     NAME = 2,
-    TEXT = 3
+    TEXT = 3,
 }
 
-async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, chapter: number, verse: number): Promise<{ result: string, time: number }> {
+async function queryVerse(
+    g: ProtoGremlin,
+    rootOffset: VertexRef,
+    book: string,
+    chapter: number,
+    verse: number
+): Promise<{ result: string; time: number }> {
     const vr = []
     const startTime = new Date().getTime()
-    for await (const result of g.V([rootOffset])
+    for await (const result of g
+        .V([rootOffset])
         .out(RlshpTypes.book)
         .has(ObjectTypes.BOOK, { keyType: KeyTypes.ID, operation: eq(book) })
         .out(RlshpTypes.chapter)
-        .has(ObjectTypes.CHAPTER, { keyType: KeyTypes.ID, operation: eq(chapter) })
+        .has(ObjectTypes.CHAPTER, {
+            keyType: KeyTypes.ID,
+            operation: eq(chapter),
+        })
         .out(RlshpTypes.verse)
         .has(ObjectTypes.VERSE, { keyType: KeyTypes.ID, operation: eq(verse) })
         .values(KeyTypes.TEXT)
@@ -54,46 +69,74 @@ async function queryVerse(g: ProtoGremlin, rootOffset: VertexRef, book: string, 
 }
 
 describe('IPFS block-store', function () {
-
     describe('Query ', function () {
-
-        test("bible quick scan, retrieve verse - Gen 1 1", async () => {
-
-            const cid = CID.parse('bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4')
+        test('bible quick scan, retrieve verse - Gen 1 1', async () => {
+            const cid = CID.parse(
+                'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+            )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
             const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
-            const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
-            const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
+            const { buildRootIndex } = blockIndexFactory({
+                linkCodec,
+                blockStore,
+            })
+            const rootStore: RootStore = initRootStore(
+                await buildRootIndex(cid)
+            )
 
-            const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+            const g: ProtoGremlin = protoGremlinFactory({
+                chunk,
+                linkCodec,
+                blockCodec,
+                blockStore,
+                rootStore,
+            }).g()
 
             const { result, time } = await queryVerse(g, 0, 'Gen', 1, 1)
 
-            assert.strictEqual(result, 'In the beginning God created the heaven and the earth.')
+            assert.strictEqual(
+                result,
+                'In the beginning God created the heaven and the earth.'
+            )
             assert.ok(time < 300) // 300 ms
         })
 
-        test("bible full scan, retrieve verse - Rev 22 21", async () => {
-
-            const cid = CID.parse('bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4')
+        test('bible full scan, retrieve verse - Rev 22 21', async () => {
+            const cid = CID.parse(
+                'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+            )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
             const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
-            const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
-            const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
+            const { buildRootIndex } = blockIndexFactory({
+                linkCodec,
+                blockStore,
+            })
+            const rootStore: RootStore = initRootStore(
+                await buildRootIndex(cid)
+            )
 
-            const g: ProtoGremlin = protoGremlinFactory({ chunk, linkCodec, blockCodec, blockStore, rootStore }).g()
+            const g: ProtoGremlin = protoGremlinFactory({
+                chunk,
+                linkCodec,
+                blockCodec,
+                blockStore,
+                rootStore,
+            }).g()
 
             const { result, time } = await queryVerse(g, 0, 'Rev', 22, 21)
 
-            assert.strictEqual(result, 'The grace of our Lord Jesus Christ be with you all. Amen.')
+            assert.strictEqual(
+                result,
+                'The grace of our Lord Jesus Christ be with you all. Amen.'
+            )
             assert.ok(time < 3000) // 3sec
         })
     })
