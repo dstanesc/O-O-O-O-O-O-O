@@ -1,27 +1,60 @@
-import { Graph, Tx } from "../graph"
-import { LinkCodec, BlockCodec } from "../codecs"
-import { graphStore } from "../graph-store"
-import { BlockStore } from "../block-store"
-import { RootStore } from "../root-store"
-import { IndexStore } from "../index-store"
+import { Graph, Tx } from '../graph'
+import { LinkCodec, BlockCodec } from '../codecs'
+import { graphStore } from '../graph-store'
+import { BlockStore } from '../block-store'
+import { RootStore } from '../root-store'
+import { IndexStore } from '../index-store'
 
-
-import { Edge, EdgeRef, Prop, PropValue, KeyType, Vertex, VertexRef, VertexType, EdgeType, PropType, Link, RootIndex, Block, Part, Ref, Type, IndexType } from "../types"
-import { EdgePathElem, ExtractPathElem, PathElem, PathElemType, PropPredicate, VertexPathElem, navigateVertices, navigateEdges, NavigationThreshold } from "../navigate"
+import {
+    Edge,
+    EdgeRef,
+    Prop,
+    PropValue,
+    KeyType,
+    Vertex,
+    VertexRef,
+    VertexType,
+    EdgeType,
+    PropType,
+    Link,
+    RootIndex,
+    Block,
+    Part,
+    Ref,
+    Type,
+    IndexType,
+} from '../types'
+import {
+    EdgePathElem,
+    ExtractPathElem,
+    PathElem,
+    PathElemType,
+    PropPredicate,
+    VertexPathElem,
+    navigateVertices,
+    navigateEdges,
+    NavigationThreshold,
+} from '../navigate'
 
 interface ProtoGremlinFactory {
     g: () => ProtoGremlin
 }
 
-const protoGremlinFactory = ({ chunk, linkCodec, blockCodec, blockStore, rootStore, indexStore }: {
-    chunk: (buffer: Uint8Array) => Uint32Array,
-    linkCodec: LinkCodec,
-    blockCodec: BlockCodec,
-    blockStore: BlockStore,
-    rootStore: RootStore,
+const protoGremlinFactory = ({
+    chunk,
+    linkCodec,
+    blockCodec,
+    blockStore,
+    rootStore,
+    indexStore,
+}: {
+    chunk: (buffer: Uint8Array) => Uint32Array
+    linkCodec: LinkCodec
+    blockCodec: BlockCodec
+    blockStore: BlockStore
+    rootStore: RootStore
     indexStore?: IndexStore
 }): ProtoGremlinFactory => {
-
     const g = (): ProtoGremlin => {
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const graph = new Graph(rootStore, store, indexStore)
@@ -29,7 +62,6 @@ const protoGremlinFactory = ({ chunk, linkCodec, blockCodec, blockStore, rootSto
     }
     return { g }
 }
-
 
 interface Navigation {
     path: PathElem[]
@@ -39,7 +71,6 @@ interface Navigation {
 }
 
 abstract class NavigateWrapper {
-
     graph: Graph
     navigation: Navigation
 
@@ -66,7 +97,7 @@ abstract class NavigateWrapper {
     values(...keys: KeyType[]): NavigateWrapper {
         const pathElem: ExtractPathElem = {
             elemType: PathElemType.EXTRACT,
-            props: keys
+            props: keys,
         }
         this.navigation.path.push(pathElem)
         return this
@@ -77,28 +108,29 @@ abstract class NavigateWrapper {
         return this
     }
 
-    async * exec(): AsyncGenerator<Part, void, void> {
+    async *exec(): AsyncGenerator<Part, void, void> {
         const navigator: NavigateWrapper = this.navigation.navigator
         const refs = this.navigation.refs
         yield* navigator.navigate(refs)
     }
 
     abstract navigate(refs: Ref[]): AsyncGenerator<Part, void, void>
-
 }
 
 class NavigateVertexWrapper extends NavigateWrapper {
-
     constructor(graph: Graph, navigation: Navigation) {
         super(graph, navigation)
     }
 
     merge(previous: PathElem, current: PathElem): PathElem {
-
         const p = previous as VertexPathElem
         const c = current as VertexPathElem
 
-        const r: VertexPathElem = { elemType: PathElemType.VERTEX, types: undefined, propPredicate: undefined }
+        const r: VertexPathElem = {
+            elemType: PathElemType.VERTEX,
+            types: undefined,
+            propPredicate: undefined,
+        }
 
         if (p.types === undefined && c.types === undefined) {
             // ok
@@ -106,22 +138,22 @@ class NavigateVertexWrapper extends NavigateWrapper {
             r.types = p.types
         else if (p.types === undefined && c.types !== undefined)
             r.types = c.types
-        else
-            r.types = p.types.filter(type => c.types.includes(type))
+        else r.types = p.types.filter((type) => c.types.includes(type))
 
         if (p.propPredicate === undefined && c.propPredicate === undefined) {
             // ok
-        } else if (p.propPredicate !== undefined && c.propPredicate === undefined)
+        } else if (
+            p.propPredicate !== undefined &&
+            c.propPredicate === undefined
+        )
             r.propPredicate = p.propPredicate
         else if (p.propPredicate === undefined && c.propPredicate !== undefined)
             r.propPredicate = c.propPredicate
-        else
-            throw new Error(`Cannot merge prop predicates`)
+        else throw new Error(`Cannot merge prop predicates`)
         //r.propPredicate = p.propPredicate && c.propPredicate
 
         return r
     }
-
 
     hasType(...vertexTypes: VertexType[]): NavigateVertexWrapper {
         const pathElem: VertexPathElem = {
@@ -132,11 +164,14 @@ class NavigateVertexWrapper extends NavigateWrapper {
         return this
     }
 
-    has(vertexType: VertexType, propPredicate: PropPredicate): NavigateVertexWrapper {
+    has(
+        vertexType: VertexType,
+        propPredicate: PropPredicate
+    ): NavigateVertexWrapper {
         const pathElem: VertexPathElem = {
             elemType: PathElemType.VERTEX,
             types: [vertexType],
-            propPredicate
+            propPredicate,
         }
         this.mergePush(pathElem)
         return this
@@ -155,25 +190,30 @@ class NavigateVertexWrapper extends NavigateWrapper {
         return this.outE(...edgeTypes).inV()
     }
 
-    async * navigate(refs: VertexRef[]): AsyncGenerator<Part, void, void> {
+    async *navigate(refs: VertexRef[]): AsyncGenerator<Part, void, void> {
         if (this.navigation.request === undefined)
             this.navigation.request = new NavigationThreshold(100)
-        yield* navigateVertices(this.graph, refs, { path: this.navigation.path, request: this.navigation.request })
+        yield* navigateVertices(this.graph, refs, {
+            path: this.navigation.path,
+            request: this.navigation.request,
+        })
     }
 }
 
 class NavigateEdgeWrapper extends NavigateWrapper {
-
     constructor(graph: Graph, navigation: Navigation) {
         super(graph, navigation)
     }
 
     merge(previous: PathElem, current: PathElem): PathElem {
-
         const p = previous as EdgePathElem
         const c = current as EdgePathElem
 
-        const r: EdgePathElem = { elemType: PathElemType.EDGE, types: undefined, propPredicate: undefined }
+        const r: EdgePathElem = {
+            elemType: PathElemType.EDGE,
+            types: undefined,
+            propPredicate: undefined,
+        }
 
         if (p.types === undefined && c.types === undefined) {
             // ok
@@ -181,12 +221,14 @@ class NavigateEdgeWrapper extends NavigateWrapper {
             r.types = p.types
         else if (p.types === undefined && c.types !== undefined)
             r.types = c.types
-        else
-            r.types = p.types.filter(type => c.types.includes(type))
+        else r.types = p.types.filter((type) => c.types.includes(type))
 
         if (p.propPredicate === undefined && c.propPredicate === undefined) {
             // ok
-        } else if (p.propPredicate !== undefined && c.propPredicate === undefined)
+        } else if (
+            p.propPredicate !== undefined &&
+            c.propPredicate === undefined
+        )
             r.propPredicate = p.propPredicate
         else if (p.propPredicate === undefined && c.propPredicate !== undefined)
             r.propPredicate = c.propPredicate
@@ -209,7 +251,7 @@ class NavigateEdgeWrapper extends NavigateWrapper {
         const pathElem: EdgePathElem = {
             elemType: PathElemType.EDGE,
             types: [edgeType],
-            propPredicate
+            propPredicate,
         }
         this.mergePush(pathElem)
         return this
@@ -224,17 +266,19 @@ class NavigateEdgeWrapper extends NavigateWrapper {
         return new NavigateVertexWrapper(this.graph, this.navigation)
     }
 
-    async * navigate(refs: EdgeRef[]): AsyncGenerator<Part, void, void> {
+    async *navigate(refs: EdgeRef[]): AsyncGenerator<Part, void, void> {
         if (this.navigation.request === undefined)
             this.navigation.request = new NavigationThreshold(100)
-        yield* navigateEdges(this.graph, refs, { path: this.navigation.path, request: this.navigation.request })
+        yield* navigateEdges(this.graph, refs, {
+            path: this.navigation.path,
+            request: this.navigation.request,
+        })
     }
 }
 
-
 class CreateWrapper {
     tx: Tx
-    props: { keyType: KeyType, value: PropValue, type?: PropType }[]
+    props: { keyType: KeyType; value: PropValue; type?: PropType }[]
     constructor(tx: Tx) {
         this.tx = tx
         this.props = []
@@ -252,17 +296,29 @@ class VertexCreateWrapper extends CreateWrapper {
     async next(): Promise<VertexCreateWrapper> {
         this.vertex = this.tx.addVertex(this.vertexType)
         for (const prop of this.props) {
-            await this.tx.addVertexProp(this.vertex, prop.keyType, prop.value, prop.type)
+            await this.tx.addVertexProp(
+                this.vertex,
+                prop.keyType,
+                prop.value,
+                prop.type
+            )
         }
         return this
     }
 
-    property(keyType: KeyType, value: PropValue, type?: PropType): VertexCreateWrapper {
+    property(
+        keyType: KeyType,
+        value: PropValue,
+        type?: PropType
+    ): VertexCreateWrapper {
         this.props.push({ keyType, value, type })
         return this
     }
 
-    async uniqueIndex(keyType: KeyType, indexType?: IndexType): Promise<VertexCreateWrapper> {
+    async uniqueIndex(
+        keyType: KeyType,
+        indexType?: IndexType
+    ): Promise<VertexCreateWrapper> {
         await this.tx.uniqueIndex(this.vertex, keyType, indexType)
         return this
     }
@@ -277,7 +333,6 @@ class VertexCreateWrapper extends CreateWrapper {
 }
 
 class EdgeCreateWrapper extends CreateWrapper {
-
     edge: Edge
     edgeType: EdgeType
     fromVertex: VertexCreateWrapper
@@ -298,18 +353,33 @@ class EdgeCreateWrapper extends CreateWrapper {
         return this
     }
 
-    property(keyType: KeyType, value: PropValue, type?: PropType): EdgeCreateWrapper {
+    property(
+        keyType: KeyType,
+        value: PropValue,
+        type?: PropType
+    ): EdgeCreateWrapper {
         this.props.push({ keyType, value, type })
         return this
     }
 
     async next(): Promise<EdgeCreateWrapper> {
-        if (this.fromVertex === undefined) throw new Error("from vertex needs defined before")
-        if (this.toVertex === undefined) throw new Error("to vertex needs defined before")
-        this.edge = await this.tx.addEdge(this.fromVertex.vertex, this.toVertex.vertex, this.edgeType)
+        if (this.fromVertex === undefined)
+            throw new Error('from vertex needs defined before')
+        if (this.toVertex === undefined)
+            throw new Error('to vertex needs defined before')
+        this.edge = await this.tx.addEdge(
+            this.fromVertex.vertex,
+            this.toVertex.vertex,
+            this.edgeType
+        )
 
         for (const prop of this.props) {
-            await this.tx.addEdgeProp(this.edge, prop.keyType, prop.value, prop.type)
+            await this.tx.addEdgeProp(
+                this.edge,
+                prop.keyType,
+                prop.value,
+                prop.type
+            )
         }
         return this
     }
@@ -338,12 +408,11 @@ class ProtoGremlinTransaction {
         return new EdgeCreateWrapper(this.tx, edgeType)
     }
 
-    async commit(): Promise<{ root: Link, index: RootIndex, blocks: Block[] }> {
+    async commit(): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
         const result = await this.tx.commit()
         return result
     }
 }
-
 
 class ProtoGremlin {
     graph: Graph
@@ -355,14 +424,22 @@ class ProtoGremlin {
         const pathElem: EdgePathElem = {
             elemType: PathElemType.VERTEX,
         }
-        return new NavigateVertexWrapper(this.graph, { path: [pathElem], request: undefined, refs })
+        return new NavigateVertexWrapper(this.graph, {
+            path: [pathElem],
+            request: undefined,
+            refs,
+        })
     }
 
     E(refs: EdgeRef[]): NavigateEdgeWrapper {
         const pathElem: EdgePathElem = {
             elemType: PathElemType.EDGE,
         }
-        return new NavigateEdgeWrapper(this.graph, { path: [pathElem], request: undefined, refs })
+        return new NavigateEdgeWrapper(this.graph, {
+            path: [pathElem],
+            request: undefined,
+            refs,
+        })
     }
 
     async tx(): Promise<ProtoGremlinTransaction> {
@@ -385,4 +462,11 @@ class ProtoGremlin {
     }
 }
 
-export { ProtoGremlinFactory, ProtoGremlin, ProtoGremlinTransaction, NavigateVertexWrapper, NavigateEdgeWrapper, protoGremlinFactory } 
+export {
+    ProtoGremlinFactory,
+    ProtoGremlin,
+    ProtoGremlinTransaction,
+    NavigateVertexWrapper,
+    NavigateEdgeWrapper,
+    protoGremlinFactory,
+}

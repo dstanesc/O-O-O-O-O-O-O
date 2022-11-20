@@ -1,26 +1,21 @@
 {
-  "compilerOptions": {
-    "outDir": "dist",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "target": "es2017",
-    "lib": [
-      "es2022",
-      "DOM"
-    ],
-    "module": "es2022",
-    "moduleResolution": "node",
-    "strict": false,
-    "allowJs": true,
-    "noImplicitOverride": true,
-    "allowSyntheticDefaultImports": true,
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "incremental": true,
-    "skipLibCheck": true
-  },
-  "include": [
-    "src"
-  ]
+    "compilerOptions": {
+        "outDir": "dist",
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "target": "es2017",
+        "lib": ["es2022", "DOM"],
+        "module": "es2022",
+        "moduleResolution": "node",
+        "strict": false,
+        "allowJs": true,
+        "noImplicitOverride": true,
+        "allowSyntheticDefaultImports": true,
+        "sourceMap": true,
+        "declaration": true,
+        "declarationMap": true,
+        "incremental": true,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
 }

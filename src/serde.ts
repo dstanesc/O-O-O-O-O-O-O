@@ -1,10 +1,17 @@
-
 import {
-    Vertex, Edge, Prop,
-    Ref, Type, PropValue,
-    Link, Block, Index, IndexedValue, Status, Part,
+    Vertex,
+    Edge,
+    Prop,
+    Ref,
+    Type,
+    PropValue,
+    Link,
+    Block,
+    Index,
+    IndexedValue,
+    Status,
+    Part,
 } from './types'
-
 
 const REF_EXISTS = 0x1
 const TYPE_EXISTS = 0x1
@@ -50,12 +57,13 @@ class BinaryEncoder {
      * Unsigned 32-bit integer, little endian
      */
     writeUInt(value: number) {
-        if (value < 0 || value > 0xffffffff) throw new Error("Integer out of range")
+        if (value < 0 || value > 0xffffffff)
+            throw new Error('Integer out of range')
         const start = this.cursor
-        this.buffer[start] = (value & 0xff)
-        this.buffer[start + 1] = (value >>> 8)
-        this.buffer[start + 2] = (value >>> 16)
-        this.buffer[start + 3] = (value >>> 24)
+        this.buffer[start] = value & 0xff
+        this.buffer[start + 1] = value >>> 8
+        this.buffer[start + 2] = value >>> 16
+        this.buffer[start + 3] = value >>> 24
         this.cursor += 4
         return this.cursor
     }
@@ -64,12 +72,13 @@ class BinaryEncoder {
      *  32-bit integer, little endian
      */
     writeInt(value: number) {
-        if (value < -0x80000000 || value > 0x7fffffff) throw new Error("Integer out of range")
+        if (value < -0x80000000 || value > 0x7fffffff)
+            throw new Error('Integer out of range')
         const start = this.cursor
-        this.buffer[start] = (value & 0xff)
-        this.buffer[start + 1] = (value >>> 8)
-        this.buffer[start + 2] = (value >>> 16)
-        this.buffer[start + 3] = (value >>> 24)
+        this.buffer[start] = value & 0xff
+        this.buffer[start + 1] = value >>> 8
+        this.buffer[start + 2] = value >>> 16
+        this.buffer[start + 3] = value >>> 24
         this.cursor += 4
         return this.cursor
     }
@@ -89,7 +98,8 @@ class BinaryEncoder {
         return this.writeUInt(offset)
     }
 
-    writeRef(ref: Ref) { // 5
+    writeRef(ref: Ref) {
+        // 5
         this.writeRefExists() // 1
         return this.writeUInt(ref) // 4
     }
@@ -106,11 +116,11 @@ class BinaryEncoder {
         return this.writeByte(flags)
     }
 
-    writeType(type: Type) { //5
+    writeType(type: Type) {
+        //5
         this.writeTypeExists() // 1
         return this.writeUInt(type) // 4
     }
-
 
     writeLink(link: Link) {
         this.writeBytes(link.bytes)
@@ -125,15 +135,18 @@ class BinaryEncoder {
         return this.skipBytes(1)
     }
 
-    skipUInt() { // 4
+    skipUInt() {
+        // 4
         return this.skipBytes(4)
     }
 
-    skipRef() { // 5
+    skipRef() {
+        // 5
         return this.skipBytes(5)
     }
 
-    skipType() { // 5
+    skipType() {
+        // 5
         return this.skipBytes(5)
     }
 }
@@ -170,10 +183,11 @@ class BinaryDecoder {
      */
     readUInt() {
         const start = this.cursor
-        const value = ((this.buffer[start]) |
-            (this.buffer[start + 1] << 8) |
-            (this.buffer[start + 2] << 16)) +
-            (this.buffer[start + 3] * 0x1000000)
+        const value =
+            (this.buffer[start] |
+                (this.buffer[start + 1] << 8) |
+                (this.buffer[start + 2] << 16)) +
+            this.buffer[start + 3] * 0x1000000
         this.cursor += 4
         return value
     }
@@ -183,7 +197,8 @@ class BinaryDecoder {
      */
     readInt() {
         const start = this.cursor
-        const value = (this.buffer[start]) |
+        const value =
+            this.buffer[start] |
             (this.buffer[start + 1] << 8) |
             (this.buffer[start + 2] << 16) |
             (this.buffer[start + 3] << 24)
@@ -195,20 +210,24 @@ class BinaryDecoder {
         return this.readUInt()
     }
 
-    readRefExists() { // 1
+    readRefExists() {
+        // 1
         return this.readByte()
     }
 
-    readTypeExists() { // 1
+    readTypeExists() {
+        // 1
         return this.readByte()
     }
 
-    readStatus(): Status { // 1
+    readStatus(): Status {
+        // 1
         const flags = this.readByte()
         return flags as Status
     }
 
-    readRef() { // 5
+    readRef() {
+        // 5
         const flags = this.readRefExists() // 1
         if (flags & REF_EXISTS) {
             return this.readOffset() // 4
@@ -218,7 +237,8 @@ class BinaryDecoder {
         }
     }
 
-    readType() { // 5
+    readType() {
+        // 5
         const flags = this.readTypeExists() // 1
         if (flags & TYPE_EXISTS) {
             return this.readUInt() // 4
@@ -237,19 +257,23 @@ class BinaryDecoder {
         this.cursor += length
     }
 
-    skipReserved() { // 1
+    skipReserved() {
+        // 1
         return this.skipBytes(1)
     }
 
-    skipUInt() { // 4
+    skipUInt() {
+        // 4
         return this.skipBytes(4)
     }
 
-    skipRef() { // 5
+    skipRef() {
+        // 5
         return this.skipBytes(5)
     }
 
-    skipType() { // 5
+    skipType() {
+        // 5
         return this.skipBytes(5)
     }
 }
@@ -263,33 +287,35 @@ class VertexEncoder extends BinaryEncoder {
         this.vertices = vertices
     }
 
-    writeVertex(vertex: Vertex) { // 20
+    writeVertex(vertex: Vertex) {
+        // 20
         this.writeOffset(vertex.offset) // 4
-        if (vertex.type !== undefined)  // 5
+        if (vertex.type !== undefined)
+            // 5
             this.writeType(vertex.type)
         else this.skipType()
-        if (vertex.nextEdge !== undefined) // 5
+        if (vertex.nextEdge !== undefined)
+            // 5
             this.writeRef(vertex.nextEdge)
         else this.skipRef()
-        if (vertex.nextProp !== undefined) // 5
+        if (vertex.nextProp !== undefined)
+            // 5
             this.writeRef(vertex.nextProp)
         else this.skipRef()
-        if (vertex.nextIndex !== undefined) // 5
+        if (vertex.nextIndex !== undefined)
+            // 5
             this.writeRef(vertex.nextIndex)
         else this.skipRef()
-        this.writeStatus(vertex.status) // 1 
+        this.writeStatus(vertex.status) // 1
     }
 
     write() {
-        for (const vertex of this.vertices)
-            this.writeVertex(vertex)
-        return this.content();
+        for (const vertex of this.vertices) this.writeVertex(vertex)
+        return this.content()
     }
 }
 
-
 class VertexDecoder extends BinaryDecoder {
-
     readVertex(): Vertex {
         const offset = this.readOffset()
         const type = this.readType()
@@ -298,19 +324,16 @@ class VertexDecoder extends BinaryDecoder {
         const nextIndex = this.readRef()
         const status = this.readStatus()
         const vertex: Vertex = { status, offset }
-        if (type !== undefined)
-            vertex.type = type
-        if (nextEdge !== undefined)
-            vertex.nextEdge = nextEdge
-        if (nextProp !== undefined)
-            vertex.nextProp = nextProp
-        if (nextIndex !== undefined)
-            vertex.nextIndex = nextIndex
+        if (type !== undefined) vertex.type = type
+        if (nextEdge !== undefined) vertex.nextEdge = nextEdge
+        if (nextProp !== undefined) vertex.nextProp = nextProp
+        if (nextIndex !== undefined) vertex.nextIndex = nextIndex
         return vertex
     }
 
     read(): Vertex[] {
-        if (this.buffer.byteLength % VERTEX_SIZE_BYTES !== 0) throw new Error("Invalid vertex serialization")
+        if (this.buffer.byteLength % VERTEX_SIZE_BYTES !== 0)
+            throw new Error('Invalid vertex serialization')
         const size = Math.trunc(this.buffer.byteLength / VERTEX_SIZE_BYTES)
         const vertices = []
         for (let i = 0; i < size; i++) {
@@ -330,38 +353,41 @@ class EdgeEncoder extends BinaryEncoder {
     }
     writeEdge(edge: Edge) {
         this.writeOffset(edge.offset) // 4
-        if (edge.type !== undefined)  // 5
+        if (edge.type !== undefined)
+            // 5
             this.writeType(edge.type)
         else this.skipType()
-        this.writeRef(edge.source)  // 5
-        this.writeRef(edge.target)  // 5
-        if (edge.sourcePrev !== undefined) // 5
+        this.writeRef(edge.source) // 5
+        this.writeRef(edge.target) // 5
+        if (edge.sourcePrev !== undefined)
+            // 5
             this.writeRef(edge.sourcePrev)
         else this.skipRef()
-        if (edge.sourceNext !== undefined) // 5
+        if (edge.sourceNext !== undefined)
+            // 5
             this.writeRef(edge.sourceNext)
         else this.skipRef()
-        if (edge.targetPrev !== undefined) // 5
+        if (edge.targetPrev !== undefined)
+            // 5
             this.writeRef(edge.targetPrev)
         else this.skipRef()
-        if (edge.targetNext !== undefined) // 5
+        if (edge.targetNext !== undefined)
+            // 5
             this.writeRef(edge.targetNext)
         else this.skipRef()
-        if (edge.nextProp !== undefined) // 5
+        if (edge.nextProp !== undefined)
+            // 5
             this.writeRef(edge.nextProp)
         else this.skipRef()
         this.writeStatus(edge.status) // 1
     }
     write() {
-        for (const edge of this.edges)
-            this.writeEdge(edge)
-        return this.content();
+        for (const edge of this.edges) this.writeEdge(edge)
+        return this.content()
     }
 }
 
-
 class EdgeDecoder extends BinaryDecoder {
-
     readEdge(): Edge {
         const offset = this.readOffset()
         const type = this.readType()
@@ -375,24 +401,19 @@ class EdgeDecoder extends BinaryDecoder {
         const status = this.readStatus()
         const edge: Edge = { status, offset, source, target }
 
-        if (type !== undefined)
-            edge.type = type
-        if (sourcePrev !== undefined)
-            edge.sourcePrev = sourcePrev
-        if (sourceNext !== undefined)
-            edge.sourceNext = sourceNext
-        if (targetPrev !== undefined)
-            edge.targetPrev = targetPrev
-        if (targetNext !== undefined)
-            edge.targetNext = targetNext
-        if (nextProp !== undefined)
-            edge.nextProp = nextProp
+        if (type !== undefined) edge.type = type
+        if (sourcePrev !== undefined) edge.sourcePrev = sourcePrev
+        if (sourceNext !== undefined) edge.sourceNext = sourceNext
+        if (targetPrev !== undefined) edge.targetPrev = targetPrev
+        if (targetNext !== undefined) edge.targetNext = targetNext
+        if (nextProp !== undefined) edge.nextProp = nextProp
 
         return edge
     }
 
     read(): Edge[] {
-        if (this.buffer.byteLength % EDGE_SIZE_BYTES !== 0) throw new Error("Invalid edge serialization")
+        if (this.buffer.byteLength % EDGE_SIZE_BYTES !== 0)
+            throw new Error('Invalid edge serialization')
         const size = Math.trunc(this.buffer.byteLength / EDGE_SIZE_BYTES)
         const edges = []
         for (let i = 0; i < size; i++) {
@@ -406,48 +427,70 @@ const PROP_SIZE_BYTES = 56
 
 class PropEncoder extends BinaryEncoder {
     props: Prop[]
-    blockEncode: (json: any, blockPut: (block: Block) => Promise<void>) => Promise<Link>
+    blockEncode: (
+        json: any,
+        blockPut: (block: Block) => Promise<void>
+    ) => Promise<Link>
     blockPut: (block: Block) => Promise<void>
-    constructor(props: Prop[], blockEncode: (json: any, blockPut: (block: Block) => Promise<void>) => Promise<Link>, blockPut: (block: Block) => Promise<void>) {
+    constructor(
+        props: Prop[],
+        blockEncode: (
+            json: any,
+            blockPut: (block: Block) => Promise<void>
+        ) => Promise<Link>,
+        blockPut: (block: Block) => Promise<void>
+    ) {
         super(props.length * PROP_SIZE_BYTES)
         this.props = props
         this.blockEncode = blockEncode
         this.blockPut = blockPut
     }
 
-    async writeValue(value: PropValue) { // 36
+    async writeValue(value: PropValue) {
+        // 36
         const link: Link = await this.blockEncode(value, this.blockPut)
         this.writeLink(link) // 36
     }
 
-    async writeProp(prop: Prop) { // 56
-        //console.log(prop)
+    async writeProp(prop: Prop) {
+        // 56
         this.writeOffset(prop.offset) // 4
-        if (prop.type !== undefined)  // 5
+        if (prop.type !== undefined)
+            // 5
             this.writeType(prop.type)
         else this.skipType()
         this.writeType(prop.key) // 5
         await this.writeValue(prop.value) // 36
-        if (prop.nextProp !== undefined) // 5
+        if (prop.nextProp !== undefined)
+            // 5
             this.writeRef(prop.nextProp)
         else this.skipRef()
         this.writeStatus(prop.status) // 1
     }
 
     async write() {
-        for (const prop of this.props)
-            await this.writeProp(prop)
-        return this.content();
+        for (const prop of this.props) await this.writeProp(prop)
+        return this.content()
     }
 }
 
 class PropDecoder extends BinaryDecoder {
-
     linkDecode: (linkBytes: Uint8Array) => Link
-    blockDecode: (link: Link, blockGet: (cid: any) => Promise<Uint8Array>) => Promise<PropValue>
+    blockDecode: (
+        link: Link,
+        blockGet: (cid: any) => Promise<Uint8Array>
+    ) => Promise<PropValue>
     blockGet: (cid: any) => Promise<Uint8Array>
 
-    constructor(buffer: Uint8Array, linkDecode: (linkBytes: Uint8Array) => Link, blockDecode: (link: Link, blockGet: (cid: any) => Promise<Uint8Array>) => Promise<PropValue>, blockGet: (cid: any) => Promise<Uint8Array>) {
+    constructor(
+        buffer: Uint8Array,
+        linkDecode: (linkBytes: Uint8Array) => Link,
+        blockDecode: (
+            link: Link,
+            blockGet: (cid: any) => Promise<Uint8Array>
+        ) => Promise<PropValue>,
+        blockGet: (cid: any) => Promise<Uint8Array>
+    ) {
         super(buffer)
         this.linkDecode = linkDecode
         this.blockDecode = blockDecode
@@ -468,15 +511,14 @@ class PropDecoder extends BinaryDecoder {
         const nextProp = this.readRef()
         const status = this.readStatus()
         const prop: Prop = { status, offset, key, value }
-        if (type !== undefined)
-            prop.type = type
-        if (nextProp !== undefined)
-            prop.nextProp = nextProp
+        if (type !== undefined) prop.type = type
+        if (nextProp !== undefined) prop.nextProp = nextProp
         return prop
     }
 
     async read(): Promise<Prop[]> {
-        if (this.buffer.byteLength % PROP_SIZE_BYTES !== 0) throw new Error("Invalid prop serialization")
+        if (this.buffer.byteLength % PROP_SIZE_BYTES !== 0)
+            throw new Error('Invalid prop serialization')
         const size = Math.trunc(this.buffer.byteLength / PROP_SIZE_BYTES)
         const props = []
         for (let i = 0; i < size; i++) {
@@ -495,34 +537,41 @@ class IndexEncoder extends BinaryEncoder {
         this.indices = indices
     }
 
-    async writeIndex(index: Index) { // 92
-        //console.log(prop)
+    async writeIndex(index: Index) {
+        // 92
         this.writeOffset(index.offset) // 4
-        if (index.type !== undefined)  // 5
+        if (index.type !== undefined)
+            // 5
             this.writeType(index.type)
         else this.skipType()
         this.writeType(index.key) // 5
         this.writeLink(index.value) // 36
-        if (index.nextIndex !== undefined) // 5
+        if (index.nextIndex !== undefined)
+            // 5
             this.writeRef(index.nextIndex)
         else this.skipRef()
         this.writeStatus(index.status) // 1
     }
 
     async write() {
-        for (const index of this.indices)
-            await this.writeIndex(index)
-        return this.content();
+        for (const index of this.indices) await this.writeIndex(index)
+        return this.content()
     }
 }
 
 class IndexDecoder extends BinaryDecoder {
-
     linkDecode: (linkBytes: Uint8Array) => Link
-    indexDecode: (link: Link, blockGet: (cid: any) => Promise<Uint8Array>, value?: any) => Promise<IndexedValue[]>
+    indexDecode: (
+        link: Link,
+        blockGet: (cid: any) => Promise<Uint8Array>,
+        value?: any
+    ) => Promise<IndexedValue[]>
     blockGet: (cid: any) => Promise<Uint8Array>
 
-    constructor(buffer: Uint8Array, linkDecode: (linkBytes: Uint8Array) => Link) {
+    constructor(
+        buffer: Uint8Array,
+        linkDecode: (linkBytes: Uint8Array) => Link
+    ) {
         super(buffer)
         this.linkDecode = linkDecode
     }
@@ -535,15 +584,14 @@ class IndexDecoder extends BinaryDecoder {
         const nextIndex = this.readRef()
         const status = this.readStatus()
         const index: Index = { status, offset, key, value }
-        if (type !== undefined)
-            index.type = type
-        if (nextIndex !== undefined)
-            index.nextIndex = nextIndex
+        if (type !== undefined) index.type = type
+        if (nextIndex !== undefined) index.nextIndex = nextIndex
         return index
     }
 
     async read(): Promise<Index[]> {
-        if (this.buffer.byteLength % INDEX_SIZE_BYTES !== 0) throw new Error("Invalid index serialization")
+        if (this.buffer.byteLength % INDEX_SIZE_BYTES !== 0)
+            throw new Error('Invalid index serialization')
         const size = Math.trunc(this.buffer.byteLength / INDEX_SIZE_BYTES)
         const indices = []
         for (let i = 0; i < size; i++) {
@@ -554,8 +602,7 @@ class IndexDecoder extends BinaryDecoder {
 }
 
 class RootEncoder extends BinaryEncoder {
-
-    vertexRoot: Link // 36 
+    vertexRoot: Link // 36
     vertexOffset: number // 4
     edgeRoot: Link // 36
     edgeOffset: number // 4
@@ -564,7 +611,25 @@ class RootEncoder extends BinaryEncoder {
     indexRoot: Link // 36
     indexOffset: number // 4
 
-    constructor({ vertexRoot, vertexOffset, edgeRoot, edgeOffset, propRoot, propOffset, indexRoot, indexOffset }: { vertexRoot: Link, vertexOffset: number, edgeRoot: Link, edgeOffset: number, propRoot: Link, propOffset: number, indexRoot: Link, indexOffset: number }) {
+    constructor({
+        vertexRoot,
+        vertexOffset,
+        edgeRoot,
+        edgeOffset,
+        propRoot,
+        propOffset,
+        indexRoot,
+        indexOffset,
+    }: {
+        vertexRoot: Link
+        vertexOffset: number
+        edgeRoot: Link
+        edgeOffset: number
+        propRoot: Link
+        propOffset: number
+        indexRoot: Link
+        indexOffset: number
+    }) {
         super(160)
         this.vertexRoot = vertexRoot
         this.vertexOffset = vertexOffset
@@ -579,13 +644,13 @@ class RootEncoder extends BinaryEncoder {
     write() {
         this.writeUInt(this.vertexOffset) //4
         this.writeUInt(this.edgeOffset) //4
-        this.writeUInt(this.propOffset) //4 
-        this.writeUInt(this.indexOffset) //4 
+        this.writeUInt(this.propOffset) //4
+        this.writeUInt(this.indexOffset) //4
         this.writeLink(this.vertexRoot as Link) //36
         this.writeLink(this.edgeRoot as Link) //36
         this.writeLink(this.propRoot as Link) //36
         this.writeLink(this.indexRoot as Link) //36
-        return this;
+        return this
     }
 }
 
@@ -595,7 +660,16 @@ class RootDecoder extends BinaryDecoder {
         super(buffer)
         this.linkDecode = linkDecode
     }
-    read(): { vertexRoot: Link, vertexOffset: number, edgeRoot: Link, edgeOffset: number, propRoot: Link, propOffset: number, indexRoot: Link, indexOffset: number } {
+    read(): {
+        vertexRoot: Link
+        vertexOffset: number
+        edgeRoot: Link
+        edgeOffset: number
+        propRoot: Link
+        propOffset: number
+        indexRoot: Link
+        indexOffset: number
+    } {
         const vertexOffset = this.readOffset()
         const edgeOffset = this.readOffset()
         const propOffset = this.readOffset()
@@ -604,11 +678,38 @@ class RootDecoder extends BinaryDecoder {
         const edgeRoot = this.readLink(this.linkDecode)
         const propRoot = this.readLink(this.linkDecode)
         const indexRoot = this.readLink(this.linkDecode)
-        return { vertexRoot, vertexOffset, edgeRoot, edgeOffset, propRoot, propOffset, indexRoot, indexOffset }
+        return {
+            vertexRoot,
+            vertexOffset,
+            edgeRoot,
+            edgeOffset,
+            propRoot,
+            propOffset,
+            indexRoot,
+            indexOffset,
+        }
     }
 }
 
+const OFFSET_INCREMENTS = {
+    VERTEX_INCREMENT: VERTEX_SIZE_BYTES,
+    EDGE_INCREMENT: EDGE_SIZE_BYTES,
+    PROP_INCREMENT: PROP_SIZE_BYTES,
+    INDEX_INCREMENT: INDEX_SIZE_BYTES,
+}
 
-const OFFSET_INCREMENTS = { VERTEX_INCREMENT: VERTEX_SIZE_BYTES, EDGE_INCREMENT: EDGE_SIZE_BYTES, PROP_INCREMENT: PROP_SIZE_BYTES, INDEX_INCREMENT: INDEX_SIZE_BYTES }
-
-export { BinaryEncoder, BinaryDecoder, VertexEncoder, VertexDecoder, EdgeEncoder, EdgeDecoder, PropEncoder, PropDecoder, IndexEncoder, IndexDecoder, RootEncoder, RootDecoder, OFFSET_INCREMENTS }
+export {
+    BinaryEncoder,
+    BinaryDecoder,
+    VertexEncoder,
+    VertexDecoder,
+    EdgeEncoder,
+    EdgeDecoder,
+    PropEncoder,
+    PropDecoder,
+    IndexEncoder,
+    IndexDecoder,
+    RootEncoder,
+    RootDecoder,
+    OFFSET_INCREMENTS,
+}

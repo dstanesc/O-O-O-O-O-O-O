@@ -5,7 +5,7 @@ enum Operator {
     GT,
     GTE,
     LT,
-    LTE
+    LTE,
 }
 
 interface PreProcessor {
@@ -29,35 +29,40 @@ interface Operation {
 function eq(value: any, pre?: PreProcessor): Operation {
     const operator = Operator.EQ
     const operand = value
-    const predicate = (ctx: any) => pre === undefined ? ctx === value : pre(ctx) === value
+    const predicate = (ctx: any) =>
+        pre === undefined ? ctx === value : pre(ctx) === value
     return { operator, operand, predicate }
 }
 
 function gt(value: any, pre?: PreProcessor): Operation {
     const operator = Operator.GT
     const operand = value
-    const predicate = (ctx: any) => pre === undefined ? ctx > value : pre(ctx) > value
+    const predicate = (ctx: any) =>
+        pre === undefined ? ctx > value : pre(ctx) > value
     return { operator, operand, predicate }
 }
 
 function gte(value: any, pre?: PreProcessor): Operation {
     const operator = Operator.GTE
     const operand = value
-    const predicate = (ctx: any) => pre === undefined ? ctx >= value : pre(ctx) >= value
+    const predicate = (ctx: any) =>
+        pre === undefined ? ctx >= value : pre(ctx) >= value
     return { operator, operand, predicate }
 }
 
 function lt(value: any, pre?: PreProcessor): Operation {
     const operator = Operator.LT
     const operand = value
-    const predicate = (ctx: any) => pre === undefined ? ctx < value : pre(ctx) < value
+    const predicate = (ctx: any) =>
+        pre === undefined ? ctx < value : pre(ctx) < value
     return { operator, operand, predicate }
 }
 
 function lte(value: any, pre?: PreProcessor): Operation {
     const operator = Operator.LTE
     const operand = value
-    const predicate = (ctx: any) => pre === undefined ? ctx <= value : pre(ctx) <= value
+    const predicate = (ctx: any) =>
+        pre === undefined ? ctx <= value : pre(ctx) <= value
     return { operator, operand, predicate }
 }
 
@@ -66,7 +71,8 @@ function lte(value: any, pre?: PreProcessor): Operation {
 function incl(values: any[], pre?: PreProcessor): Operation {
     const operator = Operator.INCL
     const operand = values
-    const predicate = (ctx: any) => pre === undefined ? values.includes(ctx) : values.includes(pre(ctx))
+    const predicate = (ctx: any) =>
+        pre === undefined ? values.includes(ctx) : values.includes(pre(ctx))
     return { operator, operand, predicate }
 }
 
@@ -77,4 +83,16 @@ function isTrue(): Operation {
     return { operator, operand, predicate }
 }
 
-export { Predicate, Operation, Operator, PredicateFactory, eq, gt, gte, lt, lte, isTrue, incl }
+export {
+    Predicate,
+    Operation,
+    Operator,
+    PredicateFactory,
+    eq,
+    gt,
+    gte,
+    lt,
+    lte,
+    isTrue,
+    incl,
+}

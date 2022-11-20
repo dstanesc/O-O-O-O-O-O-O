@@ -12,7 +12,10 @@ const opts = { cache, chunker, codec, hasher }
 const indexStoreFactory = (blockStore) => {
     const { put, get } = blockStore
     const indexCreate = async (values) => {
-        const list = values.map(elem => ({ key: elem.value, value: elem.ref }))
+        const list = values.map((elem) => ({
+            key: elem.value,
+            value: elem.ref,
+        }))
         let root
         for await (const node of create({ get, compare, list, ...opts })) {
             const address = await node.address
@@ -22,19 +25,23 @@ const indexStoreFactory = (blockStore) => {
         }
         return root
     }
-    
+
     const getDecoded = async (link) => {
         const bytes = await get(link)
         return await Block.decode({ bytes, codec, hasher })
     }
 
     const indexSearch = async (link, value) => {
-        const indexRoot = await load({ cid: link, get: getDecoded, compare, ...opts })
+        const indexRoot = await load({
+            cid: link,
+            get: getDecoded,
+            compare,
+            ...opts,
+        })
         const { result } = await indexRoot.get(value)
         return { value, ref: result }
     }
     return { indexCreate, indexSearch }
 }
-
 
 export { indexStoreFactory }
