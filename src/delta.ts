@@ -2,13 +2,13 @@
 
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { BlockCodec, LinkCodec } from "./codecs"
-import { Link, Part, RootIndex, Vertex } from './types'
+import { Edge, Index, Link, Part, Prop, RootIndex, Vertex } from './types'
 import { BlockStore } from "./block-store"
 import { EdgeDecoder, IndexDecoder, OFFSET_INCREMENTS, PropDecoder, VertexDecoder } from './serde'
 import fastEqual from 'fast-deep-equal/es6'
 
-interface DeltaFactory {
-    baselineDelta: ({
+interface BaselineDelta {
+    ({
         baseRoot,
         baseIndex,
         baseStore,
@@ -22,12 +22,16 @@ interface DeltaFactory {
         currentRoot: Link,
         currentIndex: RootIndex
         currentStore: BlockStore
-    }) => Promise<{
-        vertices: { added: Map<number, Part>, updated: Map<number, Part> },
-        edges: { added: Map<number, Part>, updated: Map<number, Part> },
-        props: { added: Map<number, Part>, updated: Map<number, Part> },
-        indices: { added: Map<number, Part>, updated: Map<number, Part> }
+    }): Promise<{
+        vertices: { added: Map<number, Vertex>, updated: Map<number, Vertex>, updateBaseline: Map<number, Vertex> },
+        edges: { added: Map<number, Edge>, updated: Map<number, Edge>, updateBaseline: Map<number, Edge> },
+        props: { added: Map<number, Prop>, updated: Map<number, Prop>, updateBaseline: Map<number, Prop> },
+        indices: { added: Map<number, Index>, updated: Map<number, Index>, updateBaseline: Map<number, Index> }
     }>
+}
+
+interface DeltaFactory {
+    baselineDelta: BaselineDelta
     baselineChangesRecords: ({
         recordSize,
         baseRoot,
@@ -103,19 +107,9 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
 
     const { read } = chunkyStore()
 
-    const merge = async (
-        { baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore, otherRoot, otherIndex, otherStore }: 
-        { baseRoot: Link, baseIndex: RootIndex, baseStore: BlockStore, currentRoot: Link, currentIndex: RootIndex, currentStore: BlockStore, otherRoot: Link, otherIndex: RootIndex, otherStore: BlockStore }) => {
-
-        const currentDelta = baselineDelta({ baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore  })
-        const otherDelta = baselineDelta({ baseRoot, baseIndex, baseStore, currentRoot: otherRoot, currentIndex: otherIndex, currentStore: otherStore })
-
-        // FIXME WIP
-    }
-
     const baselineDelta = async (
-        { baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore }: 
-        { baseRoot: Link, baseIndex: RootIndex, baseStore: BlockStore, currentRoot: Link, currentIndex: RootIndex, currentStore: BlockStore }) => {
+        { baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore }:
+            { baseRoot: Link, baseIndex: RootIndex, baseStore: BlockStore, currentRoot: Link, currentIndex: RootIndex, currentStore: BlockStore }) => {
         const {
             vertexRoot: baseVertexRoot,
             vertexOffset: baseVertexOffset,
@@ -146,7 +140,7 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
             indexIndex: currentIndexIndex
         } = currentIndex
 
-        const { added: verticesAdded, updated: verticesUpdated } = await baselineChangesRecords({
+        const { added: verticesAdded, updated: verticesUpdated, updateBaseline: verticesBaseline } = await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.VERTEX_INCREMENT,
             baseRoot: baseVertexRoot,
             baseIndex: baseVertexIndex,
@@ -157,7 +151,7 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
             recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) => new VertexDecoder(bytes).read()
         })
 
-        const { added: edgesAdded, updated: edgesUpdated } = await baselineChangesRecords({
+        const { added: edgesAdded, updated: edgesUpdated, updateBaseline: edgesBaseline } = await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.EDGE_INCREMENT,
             baseRoot: baseEdgeRoot,
             baseIndex: baseEdgeIndex,
@@ -168,7 +162,7 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
             recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) => new EdgeDecoder(bytes).read()
         })
 
-        const { added: propsAdded, updated: propsUpdated } = await baselineChangesRecords({
+        const { added: propsAdded, updated: propsUpdated, updateBaseline: propsBaseline } = await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.PROP_INCREMENT,
             baseRoot: basePropRoot,
             baseIndex: basePropIndex,
@@ -179,7 +173,7 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
             recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) => await new PropDecoder(bytes, linkDecode, blockDecode, blockStore.get).read()
         })
 
-        const { added: indicesAdded, updated: indicesUpdated } = await baselineChangesRecords({
+        const { added: indicesAdded, updated: indicesUpdated, updateBaseline: indicesBaseline } = await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.PROP_INCREMENT,
             baseRoot: basePropRoot,
             baseIndex: basePropIndex,
@@ -191,16 +185,17 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
         })
 
         return {
-            vertices: { added: verticesAdded, updated: verticesUpdated },
-            edges: { added: edgesAdded, updated: edgesUpdated },
-            props: { added: propsAdded, updated: propsUpdated },
-            indices: { added: indicesAdded, updated: indicesUpdated }
+            vertices: { added: verticesAdded, updated: verticesUpdated, updateBaseline: verticesBaseline },
+            edges: { added: edgesAdded, updated: edgesUpdated, updateBaseline: edgesBaseline },
+            props: { added: propsAdded, updated: propsUpdated, updateBaseline: propsBaseline },
+            indices: { added: indicesAdded, updated: indicesUpdated, updateBaseline: indicesBaseline }
         }
     }
 
-    const baselineChangesRecords = async (
-        { recordSize, baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore, recordsDecode }: 
-        { recordSize: number, baseRoot: Link, baseIndex: any, baseStore: BlockStore, currentRoot: Link, currentIndex: any, currentStore: BlockStore, recordsDecode: (cidBytes: Uint8Array, blockStore: BlockStore) => Promise<Part[]> }): Promise<{ added: Map<number, Part>, updated: Map<number, Part> }> => {
+    const baselineChangesRecords = async <T extends Part>(
+        { recordSize, baseRoot, baseIndex, baseStore, currentRoot, currentIndex, currentStore, recordsDecode }:
+            { recordSize: number, baseRoot: Link, baseIndex: any, baseStore: BlockStore, currentRoot: Link, currentIndex: any, currentStore: BlockStore, recordsDecode: (cidBytes: Uint8Array, blockStore: BlockStore) => Promise<T[]> })
+        : Promise<{ added: Map<number, T>, updated: Map<number, T>, updateBaseline: Map<number, T> }> => {
         const {
             startOffsets: baseStartOffsets,
             indexSize: baseIndexSize,
@@ -240,31 +235,34 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
         }
 
         const adjustedRanges = getAdjustedRanges()
-        const added: Map<number, Part> = new Map()
-        const updated: Map<number, Part> = new Map()
+        const added: Map<number, T> = new Map()
+        const updated: Map<number, T> = new Map()
+        const updateBaseline: Map<number, T> = new Map()
 
         for (const range of adjustedRanges) {
             const currentRangeBytes = await read(range.start, range.end - range.start, { root: currentRoot, index: currentIndex, decode: linkDecode, get: currentStore.get })
-            const currentRecords: Part[] = await recordsDecode(currentRangeBytes, currentStore)
+            const currentRecords: T[] = await recordsDecode(currentRangeBytes, currentStore)
 
             if (range.end <= baseByteArraySize) {
                 const baseRangeBytes = await read(range.start, range.end - range.start, { root: baseRoot, index: baseIndex, decode: linkDecode, get: baseStore.get })
-                const baseRecords: Part[] = await recordsDecode(baseRangeBytes, baseStore)
+                const baseRecords: T[] = await recordsDecode(baseRangeBytes, baseStore)
                 for (let i = 0; i < currentRecords.length; i++) {
                     const currentRecord = currentRecords[i]
                     const baseRecord = baseRecords[i]
                     if (!fastEqual(currentRecord, baseRecord)) {
                         updated.set(currentRecord.offset, currentRecord)
+                        updateBaseline.set(currentRecord.offset, baseRecord)
                     }
                 }
             } else if (range.start < baseByteArraySize) {
                 const baseRangeBytes = await read(range.start, baseByteArraySize - range.start, { root: baseRoot, index: baseIndex, decode: linkDecode, get: baseStore.get })
-                const baseRecords: Part[] = await recordsDecode(baseRangeBytes, baseStore)
+                const baseRecords: T[] = await recordsDecode(baseRangeBytes, baseStore)
                 for (let i = 0; i < baseRecords.length; i++) {
                     const currentRecord = currentRecords[i]
                     const baseRecord = baseRecords[i]
                     if (!fastEqual(currentRecord, baseRecord)) {
                         updated.set(currentRecord.offset, currentRecord)
+                        updateBaseline.set(currentRecord.offset, baseRecord)
                     }
                 }
                 for (let i = baseRecords.length; i < currentRecords.length; i++) {
@@ -279,10 +277,10 @@ const deltaFactory = ({ linkCodec, blockCodec }: {
             }
         }
 
-        return { added, updated }
+        return { added, updated, updateBaseline }
     }
 
     return { baselineDelta, baselineChangesRecords }
 }
 
-export { deltaFactory, DeltaFactory } 
+export { deltaFactory, DeltaFactory, BaselineDelta} 

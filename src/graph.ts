@@ -361,13 +361,25 @@ class Tx implements ElementAccessor {
         if (type !== undefined)
             edge.type = type
         this.edges.added.set(edge.offset, edge)
-        if (source.nextEdge !== undefined)
-            await this.appendEdge(source.nextEdge, edge)
-        else {
+        if (source.nextEdge !== undefined) {
+            const nextEdge: Edge = await this.getEdge(source.nextEdge)
+            await this.appendEdge(nextEdge, edge)
+        } else {
             source.nextEdge = offset
             this.notifyVertexUpdate(source)
         }
         return edge
+    }
+
+    async linkVertexEdge(source: Vertex, edgeRef: EdgeRef): Promise<void> {
+        const edge: Edge = await this.getEdge(edgeRef)
+        if (source.nextEdge !== undefined) {
+            const nextEdge: Edge = await this.getEdge(source.nextEdge)
+            await this.appendEdge(nextEdge, edge)
+        } else {
+            source.nextEdge = edgeRef
+            this.notifyVertexUpdate(source)
+        }
     }
 
     async addVertexProp(vertex: Vertex, key: KeyType, value: PropValue, type?: PropType): Promise<Prop> {
@@ -376,13 +388,25 @@ class Tx implements ElementAccessor {
         if (type !== undefined)
             prop.type = type
         this.props.added.set(prop.offset, prop)
-        if (vertex.nextProp !== undefined)
-            await this.appendProp(vertex.nextProp, prop)
-        else {
+        if (vertex.nextProp !== undefined) {
+            const nextProp: Prop = await this.getProp(vertex.nextProp)
+            await this.appendProp(nextProp, prop)
+        } else {
             vertex.nextProp = offset
             this.notifyVertexUpdate(vertex)
         }
         return prop
+    }
+
+    async linkVertexProp(source: Vertex, propRef: PropRef): Promise<void> {
+        const prop: Prop = await this.getProp(propRef)
+        if (source.nextProp !== undefined) {
+            const nextProp: Prop = await this.getProp(source.nextProp)
+            await this.appendProp(nextProp, prop)
+        } else {
+            source.nextProp = propRef
+            this.notifyVertexUpdate(source)
+        }
     }
 
     async addVertexIndex(vertex: Vertex, key: KeyType, value: Link, type?: IndexType): Promise<Index> {
@@ -406,19 +430,37 @@ class Tx implements ElementAccessor {
         if (type !== undefined)
             prop.type = type
         this.props.added.set(prop.offset, prop)
-        if (edge.nextProp !== undefined)
-            await this.appendProp(edge.nextProp, prop)
-        else {
+        if (edge.nextProp !== undefined) {
+            const nextProp: Prop = await this.getProp(edge.nextProp)
+            await this.appendProp(nextProp, prop)
+        } else {
             edge.nextProp = offset
             this.notifyEdgeUpdate(edge)
         }
         return prop
     }
 
-    async appendEdge(currentRef: EdgeRef, newEdge: Edge): Promise<void> {
-        const currentEdge: Edge = await this.getEdge(currentRef)
+    async linkEdgeProp(edge: Edge, propRef: PropRef): Promise<void> {
+        const prop: Prop = await this.getProp(propRef)
+        if (edge.nextProp !== undefined) {
+            const nextProp: Prop = await this.getProp(edge.nextProp)
+            await this.appendProp(nextProp, prop)
+        } else {
+            edge.nextProp = propRef
+            this.notifyEdgeUpdate(edge)
+        }
+    }
+
+    async linkEdge(currentEdge: Edge, edgeRef: EdgeRef): Promise<void> {
+        const edge: Edge = await this.getEdge(edgeRef)
+        await this.appendEdge(currentEdge, edge)
+    }
+
+    async appendEdge(currentEdge: Edge, newEdge: Edge): Promise<void> {
+        if (currentEdge.offset === newEdge.offset) throw new Error(`Invalid edge append. Cannot append to itself`)
         if (currentEdge.sourceNext !== undefined) {
-            this.appendEdge(currentEdge.sourceNext, newEdge)
+            const sourceNext: Edge = await this.getEdge(currentEdge.sourceNext)
+            await this.appendEdge(sourceNext, newEdge)
         } else {
             currentEdge.sourceNext = newEdge.offset
             newEdge.sourcePrev = currentEdge.offset
@@ -426,10 +468,16 @@ class Tx implements ElementAccessor {
         }
     }
 
-    async appendProp(currentRef: PropRef, newProp: Prop): Promise<void> {
-        const currentProp: Prop = await this.getProp(currentRef)
+    async linkProp(currentProp: Prop, propRef: PropRef): Promise<void> {
+        const prop: Prop = await this.getProp(propRef)
+        await this.appendProp(currentProp, prop)
+    }
+
+    async appendProp(currentProp: Prop, newProp: Prop): Promise<void> {
+        if (currentProp.offset === newProp.offset) throw new Error(`Invalid prop append. Cannot append to itself`)
         if (currentProp.nextProp !== undefined) {
-            this.appendProp(currentProp.nextProp, newProp)
+            const nextProp: Prop = await this.getProp(currentProp.nextProp)
+            await this.appendProp(nextProp, newProp)
         } else {
             currentProp.nextProp = newProp.offset
             this.notifyPropUpdate(currentProp)
@@ -438,8 +486,9 @@ class Tx implements ElementAccessor {
 
     async appendVertexIndex(currentRef: IndexRef, newIndex: Index): Promise<void> {
         const currentIndex: Index = await this.getIndex(currentRef)
+        if (currentIndex.offset === newIndex.offset) throw new Error(`Invalid index append. Cannot append to itself`)
         if (currentIndex.nextIndex !== undefined) {
-            this.appendVertexIndex(currentIndex.nextIndex, newIndex)
+            await this.appendVertexIndex(currentIndex.nextIndex, newIndex)
         } else {
             currentIndex.nextIndex = newIndex.offset
             this.notifyIndexUpdate(currentIndex)
