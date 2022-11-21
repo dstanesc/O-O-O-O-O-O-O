@@ -125,14 +125,14 @@ async function publish() {
 
 async function query() {
     const cid = CID.parse(
-        'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+        'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
     )
     const cache = {}
     const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
     const blockCodec: BlockCodec = blockCodecFactory()
-    //const resolver = (cid: any) => `https://cloudflare-ipfs.com/ipfs/${cid.toString()}`
-    const blockStore = httpBlockStore({ cache })
+    const resolver = (cid: any) => `https://cloudflare-ipfs.com/ipfs/${cid.toString()}`
+    const blockStore = httpBlockStore({ cache, resolver })
     const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
     const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
     const g: ProtoGremlin = protoGremlinFactory({
@@ -178,4 +178,4 @@ async function queryVerse(
     return { result: vr[0].value, time }
 }
 
-await publish()
+await query()

@@ -72,7 +72,7 @@ describe('IPFS block-store', function () {
     describe('Query ', function () {
         test('bible quick scan, retrieve verse - Gen 1 1', async () => {
             const cid = CID.parse(
-                'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
             )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
@@ -107,7 +107,7 @@ describe('IPFS block-store', function () {
 
         test('bible full scan, retrieve verse - Rev 22 21', async () => {
             const cid = CID.parse(
-                'bafkreibbirr5na66us6jjkpycr3qnt4ukbzmkjq4ic5jo7tmp2ngrbd7d4'
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
             )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
