@@ -2,7 +2,6 @@ import { Graph, Tx } from '../graph'
 import { LinkCodec, BlockCodec } from '../codecs'
 import { graphStore } from '../graph-store'
 import { BlockStore } from '../block-store'
-import { RootStore } from '../root-store'
 import { IndexStore } from '../index-store'
 
 import {
@@ -23,6 +22,7 @@ import {
     Ref,
     Type,
     IndexType,
+    Tag,
 } from '../types'
 import {
     EdgePathElem,
@@ -35,6 +35,7 @@ import {
     navigateEdges,
     NavigationThreshold,
 } from '../navigate'
+import { VersionStore } from '../version-store'
 
 interface ProtoGremlinFactory {
     g: () => ProtoGremlin
@@ -45,19 +46,19 @@ const protoGremlinFactory = ({
     linkCodec,
     blockCodec,
     blockStore,
-    rootStore,
+    versionStore,
     indexStore,
 }: {
     chunk: (buffer: Uint8Array) => Uint32Array
     linkCodec: LinkCodec
     blockCodec: BlockCodec
     blockStore: BlockStore
-    rootStore: RootStore
+    versionStore: VersionStore
     indexStore?: IndexStore
 }): ProtoGremlinFactory => {
     const g = (): ProtoGremlin => {
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
-        const graph = new Graph(rootStore, store, indexStore)
+        const graph = new Graph(versionStore, store, indexStore)
         return new ProtoGremlin(graph)
     }
     return { g }
@@ -408,8 +409,14 @@ class ProtoGremlinTransaction {
         return new EdgeCreateWrapper(this.tx, edgeType)
     }
 
-    async commit(): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
-        const result = await this.tx.commit()
+    async commit({
+        comment,
+        tags,
+    }: {
+        comment?: Comment
+        tags?: Tag[]
+    }): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
+        const result = await this.tx.commit({ comment, tags })
         return result
     }
 }

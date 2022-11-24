@@ -5,10 +5,12 @@ import {
     BlockCodec,
 } from '../codecs'
 import { memoryBlockStoreFactory } from '../block-store'
-import { Edge, Index, Prop, Status, Vertex } from '../types'
+import { Version, Edge, Index, Prop, Status, Vertex } from '../types'
 import {
     EdgeDecoder,
     EdgeEncoder,
+    VersionDecoder,
+    VersionEncoder,
     IndexDecoder,
     IndexEncoder,
     PropDecoder,
@@ -17,6 +19,7 @@ import {
     VertexEncoder,
 } from '../serde'
 import * as assert from 'assert'
+import { CID } from 'multiformats/cid'
 
 const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodecFactory()
 const { encode: blockEncode, decode: blockDecode }: BlockCodec =
@@ -146,5 +149,54 @@ describe('Serde validation with', function () {
         const bytes = await new IndexEncoder([i1, i2, i3]).write()
         const indices = await new IndexDecoder(bytes, linkDecode).read()
         assert.deepEqual([i1, i2, i3], indices)
+    })
+
+    test('basic write and read, versions', async () => {
+        const v1: Version = {
+            root: CID.parse(
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+            ),
+            comment: 'First commit',
+            tags: ['tag0', 'tag1'],
+        }
+
+        const v2: Version = {
+            root: CID.parse(
+                'bafkreicklvs2aaeqfvs6f2pgcki2gont35chka2loq7mlah7yu4tj6bsvy'
+            ),
+            parent: CID.parse(
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+            ),
+            comment: 'Second commit',
+            tags: ['tag2'],
+        }
+
+        const v3: Version = {
+            root: CID.parse(
+                'bafkreiguifcsbkfb7jlxr7inlp5fqukmve7mv2po234jj73pp7nryvbcxu'
+            ),
+            parent: CID.parse(
+                'bafkreicklvs2aaeqfvs6f2pgcki2gont35chka2loq7mlah7yu4tj6bsvy'
+            ),
+            comment: 'Third commit',
+            tags: ['tag3'],
+        }
+
+        const bytes = await new VersionEncoder(
+            CID.parse(
+                'bafkreibygummtcvcgmld7re3s4kjfoaf4z3zgxsdsqdmh3baom4suvgnem'
+            ),
+            [v1, v2, v3],
+            blockEncode,
+            blockPut
+        ).write()
+
+        const { id, versions } = await new VersionDecoder(
+            bytes,
+            linkDecode,
+            blockDecode,
+            blockGet
+        ).read()
+        assert.deepEqual([v1, v2, v3], versions)
     })
 })

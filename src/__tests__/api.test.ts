@@ -10,7 +10,6 @@ import { graphStore } from '../graph-store'
 import { chunkerFactory } from '../chunking'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
-import { RootStore, emptyRootStore, initRootStore } from '../root-store'
 import { RequestBuilder, navigateVertices, PathElemType } from '../navigate'
 import { OFFSET_INCREMENTS } from '../serde'
 import * as assert from 'assert'
@@ -22,6 +21,7 @@ import {
 } from '../api/proto-gremlin'
 
 import { incl, isTrue } from '../ops'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
@@ -47,13 +47,21 @@ describe('Api', function () {
         }
 
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
+
         const store = graphStore({
             chunk,
             linkCodec,
             blockCodec: multiBlockCodec,
             blockStore,
         })
+
         const graph = new Graph(story, store)
 
         const tx = graph.tx()
@@ -80,7 +88,7 @@ describe('Api', function () {
             PropTypes.COMMENT
         )
 
-        const { root, index, blocks } = await tx.commit()
+        const { root, index, blocks } = await tx.commit({})
 
         const { vertexOffset, edgeOffset, propOffset } = index
 
@@ -114,14 +122,20 @@ describe('Api', function () {
         }
 
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const rootStore: RootStore = emptyRootStore()
+
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
 
         const gf: ProtoGremlinFactory = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec: multiBlockCodec,
             blockStore,
-            rootStore,
+            versionStore,
         })
 
         const g: ProtoGremlin = gf.g()
@@ -139,7 +153,7 @@ describe('Api', function () {
         const e1 = await tx.addE(RlshpTypes.COMMENT_TO).from(v1).to(v2).next()
         const e2 = await tx.addE(RlshpTypes.COMMENT_TO).from(v1).to(v3).next()
 
-        const { root, index, blocks } = await tx.commit()
+        const { root, index, blocks } = await tx.commit({})
         const { vertexOffset, edgeOffset, propOffset } = index
 
         assert.equal(OFFSET_INCREMENTS.VERTEX_INCREMENT * 3, vertexOffset)
@@ -175,7 +189,12 @@ describe('Api', function () {
         }
 
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({
             chunk,
             linkCodec,
@@ -221,7 +240,7 @@ describe('Api', function () {
             PropTypes.COMMENT
         )
 
-        const { root, index } = await tx.commit()
+        const { root, index } = await tx.commit({})
 
         const {
             vertexRoot,
@@ -404,7 +423,12 @@ describe('Api', function () {
         }
 
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const graph = new Graph(story, store)
 
@@ -438,7 +462,7 @@ describe('Api', function () {
         await tx.addVertexProp(v3, KeyTypes.VALUE, 700, PropTypes.KPI)
         await tx.addVertexProp(v3, KeyTypes.VALUE, 50, PropTypes.KPI)
 
-        const { root, index } = await tx.commit()
+        const { root, index } = await tx.commit({})
 
         const request = new RequestBuilder()
             .add(PathElemType.VERTEX)
@@ -498,7 +522,12 @@ async function createSchemaAwareGraph() {
     }
 
     const blockStore: BlockStore = memoryBlockStoreFactory()
-    const story: RootStore = emptyRootStore()
+    const story: VersionStore = await versionStoreFactory({
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+    })
     const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
     const graph = new Graph(story, store)
 
@@ -541,7 +570,7 @@ async function createSchemaAwareGraph() {
         PropTypes.COMMENT
     )
 
-    const { root, index } = await tx.commit()
+    const { root, index } = await tx.commit({})
 
     const {
         vertexRoot,

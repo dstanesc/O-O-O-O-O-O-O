@@ -1,7 +1,6 @@
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { chunkerFactory } from '../chunking'
-import { RootStore, emptyRootStore } from '../root-store'
 import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
@@ -31,6 +30,7 @@ const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 import * as assert from 'assert'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 describe('Delta for', function () {
     test('baseline changes vertices 1', async () => {
@@ -93,7 +93,12 @@ describe('Delta for', function () {
     })
 
     test('baseline changes graph', async () => {
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
 
         // baseline
@@ -114,10 +119,15 @@ describe('Delta for', function () {
         await tx.addVertexProp(v2, 1, { hello: 'v2' })
         await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
-        const { root: baseRoot, index: baseIndex } = await tx.commit()
+        const { root: baseRoot, index: baseIndex } = await tx.commit({})
 
         // current
-        const story2: RootStore = emptyRootStore()
+        const story2: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const graph2 = new Graph(story2, store)
 
         const tx2 = graph2.tx()
@@ -136,7 +146,7 @@ describe('Delta for', function () {
         await tx2.addVertexProp(w2, 1, { hello: 'v2' })
         await tx2.addVertexProp(w2, 1, { hello: 'v3' })
 
-        const { root: currentRoot, index: currentIndex } = await tx2.commit()
+        const { root: currentRoot, index: currentIndex } = await tx2.commit({})
 
         const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
 

@@ -102,6 +102,17 @@ type RootIndex = RootStruct & {
     indexIndex: any
 }
 
+type Comment = any
+
+type Tag = any
+
+type Version = {
+    root: Link
+    parent?: Link
+    comment?: Comment
+    tags?: Tag[]
+}
+
 // function isShortString<MaxBytes>(text: string, maxBytes: MaxBytes): text is ShortString<MaxBytes> {
 //     return pack(text).byteLength <= maxBytes
 // }
@@ -138,4 +149,7 @@ export {
     Block,
     RootStruct,
     RootIndex,
+    Version,
+    Comment,
+    Tag,
 }

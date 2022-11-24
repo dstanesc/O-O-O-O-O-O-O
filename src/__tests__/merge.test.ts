@@ -1,6 +1,5 @@
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
-import { RootStore, emptyRootStore, initRootStore } from '../root-store'
 import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
@@ -11,11 +10,11 @@ import {
     linkCodecFactory,
 } from '../codecs'
 import * as assert from 'assert'
-import { blockIndexFactory } from '../block-index'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
 import { eq } from '../ops'
-import { Link, Offset, Part, Prop } from '../types'
+import { Link, Offset, Part, Prop, Comment, Tag } from '../types'
 import { merge, MergePolicyEnum } from '../merge'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 /**
  * Some proto-schema
@@ -50,7 +49,13 @@ describe('Merge graphs', function () {
         /**
          * Build original data set
          */
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
+
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
 
         const graph = new Graph(story, store)
@@ -87,20 +92,14 @@ describe('Merge graphs', function () {
             PropTypes.DATA
         )
 
-        const { root: original } = await tx.commit()
-
-        // index builder
-        const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
+        const { root: original } = await tx.commit({})
 
         /**
          * Revise original, first user
          */
 
-        const rootStore1: RootStore = initRootStore(
-            await buildRootIndex(original)
-        )
         const store1 = graphStore({ chunk, linkCodec, blockCodec, blockStore })
-        const g1 = new Graph(rootStore1, store1)
+        const g1 = new Graph(story, store1)
 
         const tx1 = g1.tx()
         await tx1.start()
@@ -120,16 +119,15 @@ describe('Merge graphs', function () {
             PropTypes.DATA
         )
 
-        const { root: first } = await tx1.commit()
+        const { root: first } = await tx1.commit({})
 
         /**
          * Revise original, second user
          */
-        const rootStore2: RootStore = initRootStore(
-            await buildRootIndex(original)
-        )
+        story.checkout(original)
+
         const store2 = graphStore({ chunk, linkCodec, blockCodec, blockStore })
-        const g2 = new Graph(rootStore2, store2)
+        const g2 = new Graph(story, store2)
 
         const tx2 = g2.tx()
         await tx2.start()
@@ -149,7 +147,7 @@ describe('Merge graphs', function () {
             PropTypes.DATA
         )
 
-        const { root: second } = await tx2.commit()
+        const { root: second } = await tx2.commit({})
 
         /**
          * Merge MultiValueRegistry
@@ -218,11 +216,16 @@ describe('Merge graphs', function () {
     })
 })
 
-const query = async (root: Link): Promise<Prop[]> => {
-    const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
-    const rootStore: RootStore = initRootStore(await buildRootIndex(root))
+const query = async (versionRoot: Link): Promise<Prop[]> => {
+    const versionStore: VersionStore = await versionStoreFactory({
+        versionRoot,
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+    })
     const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
-    const graph = new Graph(rootStore, store)
+    const graph = new Graph(versionStore, store)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)
         .add(PathElemType.EDGE)

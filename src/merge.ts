@@ -5,9 +5,9 @@ import { BaselineDelta, deltaFactory, DeltaFactory } from './delta'
 import { Graph, Tx } from './graph'
 import { blockIndexFactory } from './block-index'
 import { BlockCodec, LinkCodec } from './codecs'
-import { initRootStore, RootStore } from './root-store'
 import { graphStore } from './graph-store'
 import { OFFSET_INCREMENTS } from './serde'
+import { VersionStore, versionStoreFactory } from './version-store'
 
 enum MergePolicyEnum {
     LastWriterWins,
@@ -215,17 +215,25 @@ const merge = async (
         },
     })
 
-    const rootStore: RootStore = initRootStore({
+    const story: VersionStore = await versionStoreFactory({
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore: firstStore,
+    })
+
+    const storeRoot = await story.rootSet({
         root: firstRoot,
         index: firstIndex,
     })
+
     const store = graphStore({
         chunk,
         linkCodec,
         blockCodec,
         blockStore: firstStore,
     })
-    const graph = new Graph(rootStore, store)
+    const graph = new Graph(story, store)
 
     const tx: Tx = graph.tx()
 
@@ -243,7 +251,7 @@ const merge = async (
         otherStore,
     })
 
-    return await tx.commit()
+    return await tx.commit({})
 }
 
 const policyMerge = async (

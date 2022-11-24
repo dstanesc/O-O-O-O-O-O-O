@@ -27,6 +27,8 @@ interface SearchIndex {
 interface LinkCodec {
     encode: (blockBytes: Uint8Array) => Promise<Link>
     decode: (linkBytes: Uint8Array) => Link
+    parseString: (encoded: string) => Link
+    encodeString: (link: Link) => string
 }
 
 interface BlockCodec {
@@ -48,7 +50,13 @@ const linkCodecFactory = (): LinkCodec => {
     const decode = (linkBytes: Uint8Array): Link => {
         return CID.decode(linkBytes)
     }
-    return { encode, decode }
+    const parseString = (encodedString: string): Link => {
+        return CID.parse(encodedString)
+    }
+    const encodeString = (link: Link): string => {
+        return link.toString()
+    }
+    return { encode, decode, encodeString, parseString }
 }
 
 const blockCodecFactory = (): BlockCodec => {

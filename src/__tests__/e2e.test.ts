@@ -15,9 +15,9 @@ import {
     BlockCodec,
     blockCodecFactory,
 } from '../codecs'
-import { RootStore, emptyRootStore } from '../root-store'
 import { indexStoreFactory } from '../index-store-factory'
 import { eq } from '../ops'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 const getStream = bent('https://raw.githubusercontent.com')
 
@@ -62,14 +62,19 @@ describe('e2e ', function () {
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
-        const rootStore: RootStore = emptyRootStore()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
 
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
         }).g()
 
         const tx = await g.tx()
@@ -110,14 +115,14 @@ describe('e2e ', function () {
             }
         }
 
-        const { root, index, blocks } = await tx.commit()
+        const { root, index, blocks } = await tx.commit({})
 
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
         }).g()
 
         blockStore.resetReads()
@@ -148,7 +153,11 @@ describe('e2e ', function () {
 
         console.log(`BlockStore total size = ${blockStore.size()}`)
 
-        console.log(`Root ${root.toString()}`)
+        console.log(
+            `Root ${root.toString()} storeRoot=${versionStore
+                .versionStoreRoot()
+                .toString()}`
+        )
     })
 
     test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {
@@ -162,14 +171,19 @@ describe('e2e ', function () {
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
-        const rootStore: RootStore = emptyRootStore()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const indexStore = indexStoreFactory(blockStore)
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
             indexStore,
         }).g()
 
@@ -228,14 +242,14 @@ describe('e2e ', function () {
             await verse.uniqueIndex(KeyTypes.ID)
         }
 
-        const { root, index, blocks } = await tx.commit()
+        const { root, index, blocks } = await tx.commit({})
 
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
             indexStore,
         }).g()
 
@@ -267,7 +281,11 @@ describe('e2e ', function () {
 
         console.log(`BlockStore total size = ${blockStore.size()}`)
 
-        console.log(`Root ${root.toString()}`)
+        console.log(
+            `Root ${root.toString()} storeRoot=${versionStore
+                .versionStoreRoot()
+                .toString()}`
+        )
     })
 })
 

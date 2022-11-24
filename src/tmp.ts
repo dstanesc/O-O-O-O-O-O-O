@@ -1,5 +1,9 @@
 import { protoGremlinFactory, ProtoGremlin } from './api/proto-gremlin'
-
+import {
+    v4 as uuidV4,
+    parse as uuidParse,
+    stringify as uuidStringify,
+} from 'uuid'
 import bent from 'bent'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from './chunking'
@@ -14,7 +18,6 @@ import {
     BlockCodec,
     blockCodecFactory,
 } from './codecs'
-import { RootStore, emptyRootStore, initRootStore } from './root-store'
 
 import { create as ipfsApi } from 'ipfs-http-client'
 import { blockStore as ipfsBlockStore } from '@dstanesc/ipfs-block-store'
@@ -24,9 +27,8 @@ import {
 } from '@dstanesc/http-block-store'
 
 import { eq } from './ops'
-import { CID } from 'multiformats/cid'
-import { blockIndexFactory } from './block-index'
-import { VertexRef } from './types'
+import { Link, VertexRef } from './types'
+import { VersionStore, versionStoreFactory } from './version-store'
 
 const getStream = bent('https://raw.githubusercontent.com')
 
@@ -70,14 +72,19 @@ async function publish() {
     const cache = {}
     const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
     const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
-    const rootStore: RootStore = emptyRootStore()
+    const versionStore: VersionStore = await versionStoreFactory({
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+    })
 
     const g: ProtoGremlin = protoGremlinFactory({
         chunk,
         linkCodec,
         blockCodec,
         blockStore,
-        rootStore,
+        versionStore,
     }).g()
 
     const tx = await g.tx()
@@ -118,33 +125,57 @@ async function publish() {
         }
     }
 
-    const { root, index, blocks } = await tx.commit()
+    const { root, index, blocks } = await tx.commit({})
 
-    console.log(`Bible written root=${root.toString()}`)
+    console.log(
+        `Bible written root=${root.toString()}, storeRoot=${versionStore
+            .versionStoreRoot()
+            .toString()}`
+    )
 }
 
 async function query() {
-    const cid = CID.parse(
-        'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
-    )
     const cache = {}
     const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
     const blockCodec: BlockCodec = blockCodecFactory()
-    const resolver = (cid: any) => `https://cloudflare-ipfs.com/ipfs/${cid.toString()}`
+    const resolver = (cid: any) =>
+        `http://192.168.1.205:8080/ipfs/${cid.toString()}`
     const blockStore = httpBlockStore({ cache, resolver })
-    const { buildRootIndex } = blockIndexFactory({ linkCodec, blockStore })
-    const rootStore: RootStore = initRootStore(await buildRootIndex(cid))
+    const versionRoot = linkCodec.parseString(
+        'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+    )
+    const versionStore: VersionStore = await versionStoreFactory({
+        readOnly: true,
+        versionRoot,
+        chunk,
+        linkCodec,
+        blockCodec,
+        blockStore,
+    })
+
     const g: ProtoGremlin = protoGremlinFactory({
         chunk,
         linkCodec,
         blockCodec,
         blockStore,
-        rootStore,
+        versionStore,
     }).g()
-    const { result, time } = await queryVerse(g, 0, 'Gen', 1, 1)
-    console.log(result)
-    console.log(time)
+
+    const { result: r1, time: t1 } = await queryVerse(g, 0, 'Rev', 22, 21)
+
+    console.log(r1)
+    console.log(t1)
+
+    const { result: r2, time: t2 } = await queryVerse(g, 0, 'Gen', 1, 1)
+
+    console.log(r2)
+    console.log(t2)
+
+    const { result: r3, time: t3 } = await queryVerse(g, 0, '1John', 5, 5)
+
+    console.log(r3)
+    console.log(t3)
 }
 
 async function queryVerse(

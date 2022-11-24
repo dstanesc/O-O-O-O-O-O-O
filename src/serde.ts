@@ -11,10 +11,13 @@ import {
     IndexedValue,
     Status,
     Part,
+    Version,
+    Tag,
 } from './types'
 
 const REF_EXISTS = 0x1
 const TYPE_EXISTS = 0x1
+const LINK_EXISTS = 0x1
 
 class BinaryEncoder {
     buffer: Uint8Array
@@ -122,6 +125,12 @@ class BinaryEncoder {
         return this.writeUInt(type) // 4
     }
 
+    writeLinkExists() {
+        let flags = 0
+        flags |= LINK_EXISTS
+        return this.writeByte(flags)
+    }
+
     writeLink(link: Link) {
         this.writeBytes(link.bytes)
     }
@@ -220,6 +229,11 @@ class BinaryDecoder {
         return this.readByte()
     }
 
+    readLinkExists() {
+        // 1
+        return this.readByte()
+    }
+
     readStatus(): Status {
         // 1
         const flags = this.readByte()
@@ -251,6 +265,16 @@ class BinaryDecoder {
     readLink(decode: (bytes: Uint8Array) => Link) {
         const bytes = this.readBytes(36)
         return decode(bytes)
+    }
+
+    readOptionalLink(decode: (bytes: Uint8Array) => Link): Link | undefined {
+        const flags = this.readLinkExists() // 1
+        if (flags & LINK_EXISTS) {
+            return this.readLink(decode)
+        } else {
+            this.skipBytes(36)
+            return undefined
+        }
     }
 
     skipBytes(length: number) {
@@ -691,11 +715,143 @@ class RootDecoder extends BinaryDecoder {
     }
 }
 
+const VERSION_SIZE_BYTES = 147
+const VERSION_ID_SIZE_BYTES = 36
+
+class VersionEncoder extends BinaryEncoder {
+    id: Link
+    versions: Version[]
+    blockEncode: (
+        json: any,
+        blockPut: (block: Block) => Promise<void>
+    ) => Promise<Link>
+    blockPut: (block: Block) => Promise<void>
+    constructor(
+        id: Link,
+        versions: Version[],
+        blockEncode: (
+            json: any,
+            blockPut: (block: Block) => Promise<void>
+        ) => Promise<Link>,
+        blockPut: (block: Block) => Promise<void>
+    ) {
+        super(VERSION_ID_SIZE_BYTES + versions.length * VERSION_SIZE_BYTES)
+        this.id = id
+        this.versions = versions
+        this.blockEncode = blockEncode
+        this.blockPut = blockPut
+    }
+    async writeComment(value: Comment) {
+        // 36
+        const link: Link = await this.blockEncode(value, this.blockPut)
+        this.writeLink(link) // 36
+    }
+
+    async writeTags(tags: Tag[]) {
+        // 36
+        const link: Link = await this.blockEncode(tags, this.blockPut)
+        this.writeLink(link) // 36
+    }
+
+    async writeVersion(version: Version) {
+        this.writeLink(version.root) // 36
+        if (version.parent !== undefined) {
+            this.writeLinkExists() // 1
+            this.writeLink(version.parent) // 36
+        } else this.skipBytes(37)
+        if (version.comment !== undefined) {
+            this.writeLinkExists() // 1
+            await this.writeComment(version.comment)
+        } else this.skipBytes(37)
+        if (version.tags !== undefined) {
+            this.writeLinkExists() // 1
+            await this.writeTags(version.tags)
+        } else this.skipBytes(37)
+    }
+    async write() {
+        this.writeLink(this.id) // 36
+        for (const version of this.versions) await this.writeVersion(version)
+        return this.content()
+    }
+}
+
+class VersionDecoder extends BinaryDecoder {
+    linkDecode: (linkBytes: Uint8Array) => Link
+    blockDecode: (
+        link: Link,
+        blockGet: (cid: any) => Promise<Uint8Array>
+    ) => Promise<PropValue>
+    blockGet: (cid: any) => Promise<Uint8Array>
+
+    constructor(
+        buffer: Uint8Array,
+        linkDecode: (linkBytes: Uint8Array) => Link,
+        blockDecode: (
+            link: Link,
+            blockGet: (cid: any) => Promise<Uint8Array>
+        ) => Promise<PropValue>,
+        blockGet: (cid: any) => Promise<Uint8Array>
+    ) {
+        super(buffer)
+        this.linkDecode = linkDecode
+        this.blockDecode = blockDecode
+        this.blockGet = blockGet
+    }
+
+    async readOptionalComment(): Promise<Comment | undefined> {
+        const link: Link = this.readOptionalLink(this.linkDecode)
+        if (link !== undefined) {
+            const comment: Comment = await this.blockDecode(link, this.blockGet)
+            return comment
+        } else return undefined
+    }
+
+    async readOptionalTags(): Promise<Tag[] | undefined> {
+        const link: Link = this.readOptionalLink(this.linkDecode)
+        if (link !== undefined) {
+            const tags: Tag[] = await this.blockDecode(link, this.blockGet)
+            return tags
+        } else return undefined
+    }
+
+    async readVersion(): Promise<Version> {
+        const root = this.readLink(this.linkDecode)
+        const version: Version = { root }
+        const parent = this.readOptionalLink(this.linkDecode)
+        const comment = await this.readOptionalComment()
+        const tags = await this.readOptionalTags()
+        if (parent !== undefined) version.parent = parent
+        if (comment !== undefined) version.comment = comment
+        if (tags !== undefined) version.tags = tags
+        return version
+    }
+
+    async read(): Promise<{ id: Link; versions: Version[] }> {
+        if (
+            (this.buffer.byteLength - VERSION_ID_SIZE_BYTES) %
+                VERSION_SIZE_BYTES !==
+            0
+        )
+            throw new Error('Invalid version serialization')
+        const id: Link = this.readLink(this.linkDecode)
+        const size = Math.trunc(
+            (this.buffer.byteLength - VERSION_ID_SIZE_BYTES) /
+                VERSION_SIZE_BYTES
+        )
+        const versions = []
+        for (let i = 0; i < size; i++) {
+            versions.push(await this.readVersion())
+        }
+        return { id, versions }
+    }
+}
+
 const OFFSET_INCREMENTS = {
     VERTEX_INCREMENT: VERTEX_SIZE_BYTES,
     EDGE_INCREMENT: EDGE_SIZE_BYTES,
     PROP_INCREMENT: PROP_SIZE_BYTES,
     INDEX_INCREMENT: INDEX_SIZE_BYTES,
+    VERSION_INCREMENT: VERSION_SIZE_BYTES,
 }
 
 export {
@@ -711,5 +867,7 @@ export {
     IndexDecoder,
     RootEncoder,
     RootDecoder,
+    VersionEncoder,
+    VersionDecoder,
     OFFSET_INCREMENTS,
 }

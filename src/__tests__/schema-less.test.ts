@@ -9,12 +9,12 @@ import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
-import { RootStore, emptyRootStore } from '../root-store'
 
 import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
 import { Status } from '../types'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 describe('Minimal, schema-less creation and navigation deterministic root', function () {
     test('internal api creation', async () => {
@@ -22,7 +22,12 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const graph = new Graph(story, store)
 
@@ -40,7 +45,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         await tx.addVertexProp(v2, 1, { hello: 'v2' })
         await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
-        const { root } = await tx.commit()
+        const { root } = await tx.commit({})
 
         assert.equal(
             'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
@@ -53,14 +58,19 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const rootStore: RootStore = emptyRootStore()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
 
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
         }).g()
 
         const tx = await g.tx()
@@ -76,7 +86,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const e1 = await tx.addE().from(v1).to(v2).next()
         const e2 = await tx.addE().from(v1).to(v3).next()
 
-        const { root } = await tx.commit()
+        const { root } = await tx.commit({})
 
         assert.equal(
             'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
@@ -89,7 +99,12 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const graph = new Graph(story, store)
 
@@ -107,7 +122,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const p1 = await tx.addVertexProp(v2, 1, { hello: 'v2' })
         const p2 = await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
-        await tx.commit()
+        await tx.commit({})
 
         const path = new RequestBuilder()
             .add(PathElemType.VERTEX)
@@ -138,14 +153,19 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const rootStore: RootStore = emptyRootStore()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
 
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
             blockCodec,
             blockStore,
-            rootStore,
+            versionStore,
         }).g()
 
         const tx = await g.tx()
@@ -161,7 +181,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const e1 = await tx.addE().from(v1).to(v2).next()
         const e2 = await tx.addE().from(v1).to(v3).next()
 
-        await tx.commit()
+        await tx.commit({})
 
         const vr = []
         for await (const result of g.V([v1.offset]).out().exec()) {

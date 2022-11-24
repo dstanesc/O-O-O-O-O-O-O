@@ -14,13 +14,12 @@ import {
 } from '../codecs'
 import { Graph } from '../graph'
 import { graphStore } from '../graph-store'
-import { RootStore, emptyRootStore } from '../root-store'
-
 import * as assert from 'assert'
 import { Edge, EdgeRef, Index, IndexedValue, Prop } from '../types'
 import { indexStoreFactory } from '../index-store-factory'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
 import { eq } from '../ops'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
@@ -60,7 +59,12 @@ describe('Indexing', function () {
         }
 
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const indexStore = indexStoreFactory(blockStore)
 
@@ -209,7 +213,7 @@ describe('Indexing', function () {
             IndexTypes.L2_NAME
         )
 
-        const { root } = await tx.commit()
+        const { root } = await tx.commit({})
 
         const request = new RequestBuilder()
             .add(PathElemType.VERTEX)

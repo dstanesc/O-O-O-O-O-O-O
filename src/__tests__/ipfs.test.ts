@@ -11,11 +11,9 @@ import {
     BlockCodec,
     blockCodecFactory,
 } from '../codecs'
-import { RootStore, initRootStore } from '../root-store'
 import { eq } from '../ops'
-import { CID } from 'multiformats/cid'
-import { blockIndexFactory } from '../block-index'
 import * as assert from 'assert'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 enum ObjectTypes {
     ROOT = 1,
@@ -71,29 +69,29 @@ async function queryVerse(
 describe('IPFS block-store', function () {
     describe('Query ', function () {
         test('bible quick scan, retrieve verse - Gen 1 1', async () => {
-            const cid = CID.parse(
-                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
-            )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
             const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
-            const { buildRootIndex } = blockIndexFactory({
+            const versionRoot = linkCodec.parseString(
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+            )
+            const versionStore: VersionStore = await versionStoreFactory({
+                versionRoot,
+                chunk,
                 linkCodec,
+                blockCodec,
                 blockStore,
             })
-            const rootStore: RootStore = initRootStore(
-                await buildRootIndex(cid)
-            )
 
             const g: ProtoGremlin = protoGremlinFactory({
                 chunk,
                 linkCodec,
                 blockCodec,
                 blockStore,
-                rootStore,
+                versionStore,
             }).g()
 
             const { result, time } = await queryVerse(g, 0, 'Gen', 1, 1)
@@ -106,29 +104,29 @@ describe('IPFS block-store', function () {
         })
 
         test('bible full scan, retrieve verse - Rev 22 21', async () => {
-            const cid = CID.parse(
-                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
-            )
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
             const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
-            const { buildRootIndex } = blockIndexFactory({
+            const versionRoot = linkCodec.parseString(
+                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+            )
+            const versionStore: VersionStore = await versionStoreFactory({
+                versionRoot,
+                chunk,
                 linkCodec,
+                blockCodec,
                 blockStore,
             })
-            const rootStore: RootStore = initRootStore(
-                await buildRootIndex(cid)
-            )
 
             const g: ProtoGremlin = protoGremlinFactory({
                 chunk,
                 linkCodec,
                 blockCodec,
                 blockStore,
-                rootStore,
+                versionStore,
             }).g()
 
             const { result, time } = await queryVerse(g, 0, 'Rev', 22, 21)

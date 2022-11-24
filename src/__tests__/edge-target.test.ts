@@ -10,8 +10,6 @@ import {
 } from '../codecs'
 import { Graph } from '../graph'
 import { graphStore } from '../graph-store'
-import { RootStore, emptyRootStore } from '../root-store'
-import { OFFSET_INCREMENTS } from '../serde'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
@@ -19,6 +17,7 @@ const blockCodec: BlockCodec = blockCodecFactory()
 const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 import * as assert from 'assert'
 import { Edge, EdgeRef } from '../types'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 describe('Edge, fields computed on commit', function () {
     test('targetNext and targetPrev are properly set', async () => {
@@ -41,7 +40,12 @@ describe('Edge, fields computed on commit', function () {
         }
 
         const blockStore: BlockStore = memoryBlockStoreFactory()
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
         const graph = new Graph(story, store)
 
@@ -86,7 +90,7 @@ describe('Edge, fields computed on commit', function () {
         await tx.addEdge(v5, v10, RlshpTypes.COMMENT_TO)
         await tx.addEdge(v5, v11, RlshpTypes.COMMENT_TO)
 
-        const { root, index } = await tx.commit()
+        const { root, index } = await tx.commit({})
 
         console.log(`e7.targetPrev=${e7.targetPrev}`)
         console.log(`e8.targetPrev=${e8.targetPrev}`)

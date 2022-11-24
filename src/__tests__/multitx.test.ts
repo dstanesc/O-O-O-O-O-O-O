@@ -1,6 +1,5 @@
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
-import { RootStore, emptyRootStore } from '../root-store'
 import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
@@ -19,10 +18,16 @@ const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 import * as assert from 'assert'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 describe('Multi tx', function () {
     test('w/ baseline changes, single graph shares state', async () => {
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
 
         // baseline
@@ -41,7 +46,7 @@ describe('Multi tx', function () {
         await tx.addVertexProp(v2, 1, { hello: 'v2' })
         await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
-        const { root: baseRoot, index: baseIndex } = await tx.commit()
+        const { root: baseRoot, index: baseIndex } = await tx.commit({})
 
         // next
         const tx2 = graph.tx()
@@ -52,7 +57,7 @@ describe('Multi tx', function () {
 
         await tx2.addEdge(v1, v4)
 
-        const { root: currentRoot, index: currentIndex } = await tx2.commit()
+        const { root: currentRoot, index: currentIndex } = await tx2.commit({})
 
         const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
 
@@ -77,7 +82,12 @@ describe('Multi tx', function () {
     })
 
     test('w/ baseline changes, no state shared, second graph reads initial changes via cid', async () => {
-        const story: RootStore = emptyRootStore()
+        const story: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
         const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
 
         // baseline
@@ -96,7 +106,7 @@ describe('Multi tx', function () {
         await tx.addVertexProp(v2, 1, { hello: 'v2' })
         await tx.addVertexProp(v2, 1, { hello: 'v3' })
 
-        const { root: baseRoot, index: baseIndex } = await tx.commit()
+        const { root: baseRoot, index: baseIndex } = await tx.commit({})
 
         // next
         const graph2 = new Graph(story, store)
@@ -105,7 +115,7 @@ describe('Multi tx', function () {
         const v4 = tx2.addVertex()
         const v1p = await tx2.getVertex(v1.offset)
         await tx2.addEdge(v1p, v4)
-        const { root: currentRoot, index: currentIndex } = await tx2.commit()
+        const { root: currentRoot, index: currentIndex } = await tx2.commit({})
         const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
         const { vertices, edges } = await baselineDelta({
             baseRoot,

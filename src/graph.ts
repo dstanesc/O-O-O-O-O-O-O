@@ -20,9 +20,10 @@ import {
     IndexType,
     Status,
     Part,
+    Version,
+    Comment,
+    Tag,
 } from './types'
-
-import { RootStore } from './root-store'
 
 import { OFFSET_INCREMENTS } from './serde'
 import { TraversalVisitor, traverseVertices } from './depth-first'
@@ -87,14 +88,13 @@ class Graph implements ElementAccessor {
     edges: Map<number, Edge>
     props: Map<number, Prop>
     indices: Map<number, Index>
-
-    rootSet: ({
-        root,
+    versionSet: ({
+        version,
         index,
     }: {
-        root: Link
+        version: Version
         index: RootIndex
-    }) => Promise<void>
+    }) => Promise<Link>
     rootGet: () => Promise<{ root: Link; index: RootIndex }>
     vertexGet: (
         { root, index }: { root: Link; index: RootIndex },
@@ -112,13 +112,7 @@ class Graph implements ElementAccessor {
         { root, index }: { root: Link; index: RootIndex },
         offset: number
     ) => Promise<Index>
-    offsetsGet: ({
-        root,
-        index,
-    }: {
-        root: Link
-        index: RootIndex
-    }) => Promise<{
+    offsetsGet: ({ root, index }: { root: Link; index: RootIndex }) => Promise<{
         vertexOffset: Offset
         edgeOffset: Offset
         propOffset: Offset
@@ -167,16 +161,16 @@ class Graph implements ElementAccessor {
 
     constructor(
         {
-            rootSet,
+            versionSet,
             rootGet,
         }: {
-            rootSet: ({
-                root,
+            versionSet: ({
+                version,
                 index,
             }: {
-                root: Link
+                version: Version
                 index: RootIndex
-            }) => Promise<void>
+            }) => Promise<Link>
             rootGet: () => Promise<{ root: Link; index: RootIndex }>
         },
         {
@@ -274,7 +268,7 @@ class Graph implements ElementAccessor {
         this.edges = new Map()
         this.props = new Map()
         this.indices = new Map()
-        this.rootSet = rootSet
+        this.versionSet = versionSet
         this.rootGet = rootGet
         this.vertexGet = vertexGet
         this.edgeGet = edgeGet
@@ -749,7 +743,13 @@ class Tx implements ElementAccessor {
         }
     }
 
-    async commit(): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
+    async commit({
+        comment,
+        tags,
+    }: {
+        comment?: Comment
+        tags?: Tag[]
+    }): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
         const verticesNew = new Map([
             ...this.graph.vertices,
             ...this.vertices.updated,
@@ -796,7 +796,14 @@ class Tx implements ElementAccessor {
             indices: this.indices,
         })
 
-        this.graph.rootSet({ root, index })
+        const version: Version = {
+            root,
+            parent: rootBefore.root,
+            comment,
+            tags,
+        }
+
+        await this.graph.versionSet({ version, index })
 
         this.graph.vertices = verticesNew
         this.graph.edges = edgesNew

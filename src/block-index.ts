@@ -6,9 +6,7 @@ import { BlockStore } from './block-store'
 
 interface BlockIndexFactory {
     buildRootIndex: (root: Link) => Promise<{ root: Link; index: RootIndex }>
-    buildChunkyIndex: (
-        root: Link
-    ) => Promise<{
+    buildChunkyIndex: (root: Link) => Promise<{
         indexStruct: {
             startOffsets: Map<number, any>
             indexSize: number
