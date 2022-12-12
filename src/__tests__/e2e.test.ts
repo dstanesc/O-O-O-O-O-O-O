@@ -51,7 +51,7 @@ enum IndexTypes {
 }
 
 describe('e2e ', function () {
-    test('full bible, 7MB json, no index, load and navigate', async () => {
+    test('full bible, 7MB json, no index, load, pushx and navigate', async () => {
         const stream = await getStream(
             '/bibleapi/bibleapi-bibles-json/master/kjv.json'
         )
@@ -158,6 +158,50 @@ describe('e2e ', function () {
                 .versionStoreRoot()
                 .toString()}`
         )
+
+        /**
+         * Validate push
+         */
+        const blockStore2: MemoryBlockStore = memoryBlockStoreFactory()
+
+        await blockStore.push(blockStore2)
+
+        const versionStore2: VersionStore = await versionStoreFactory({
+            readOnly: true,
+            storeRoot: versionStore.versionStoreRoot(),
+            versionRoot: undefined, // HEAD, can be omitted
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore: blockStore2,
+        })
+
+        const g3: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore: blockStore2,
+            versionStore: versionStore2,
+        }).g()
+
+
+        const first2 = await queryVerse(g3, bible.offset, 'Gen', 1, 1)
+
+        assert.equal(
+            first2,
+            'In the beginning God created the heaven and the earth.'
+        )
+
+        const last2 = await queryVerse(g3, bible.offset, 'Rev', 22, 21)
+
+        assert.equal(
+            last2,
+            'The grace of our Lord Jesus Christ be with you all. Amen.'
+        )
+
+        console.log(`BlockStore2 total size = ${blockStore2.size()}`)
+
+        assert.strictEqual(blockStore.size(), blockStore2.size())
     })
 
     test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {

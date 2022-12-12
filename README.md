@@ -1,6 +1,6 @@
 # O-O-O-O-O-O-O
 
-![](./img/OOOOOOO-W100.png) modular persistence for web3 applications. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are logical byte arrays created, modified and accessed using the [store-chunky-bytes](https://www.npmjs.com/package/@dstanesc/store-chunky-bytes) library. The current choice for data partitioning stability on change is content defined chunking (ie. FastCDC algorithm employed via [wasm-chunking-fastcdc](https://www.npmjs.com/package/@dstanesc/wasm-chunking-fastcdc-node) library). The data blocks, which are the atomic units of persistence, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexes are provided by the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
+![](./img/OOOOOOO-W100.png) content addressed persistence for graph-like structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
 
 _WIP_
 
@@ -72,7 +72,15 @@ const { root, index, blocks } = await tx.commit({
 })
 ```
 
-Navigate the graph, filter and extract data
+Optionally push created blocks elsewhere, eg. browser local, s3, etc.
+
+```ts
+import { blockStore as idbStore } from '@dstanesc/idb-block-store'
+const blockStore2 = idbStore({})
+await blockStore.push(blockStore2)
+```
+
+Navigate the graph, filter data and extract results
 
 ```ts
 const query = async (versionRoot: Link): Promise<Prop[]> => {
@@ -101,7 +109,6 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
     return vr
 }
 ```
-
 
 ## Multiple stores
 
