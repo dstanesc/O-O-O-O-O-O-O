@@ -8,12 +8,15 @@ import {
     blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import { Edge, Prop, Status, Vertex } from '../types'
 import { deltaFactory } from '../delta'
 
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
@@ -28,7 +31,7 @@ describe('Multi tx', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         // baseline
         const graph = new Graph(story, store)
@@ -59,7 +62,7 @@ describe('Multi tx', function () {
 
         const { root: currentRoot, index: currentIndex } = await tx2.commit({})
 
-        const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
+        const { baselineDelta } = deltaFactory({ linkCodec, valueCodec })
 
         const { vertices, edges } = await baselineDelta({
             baseRoot,
@@ -88,7 +91,7 @@ describe('Multi tx', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         // baseline
         const graph = new Graph(story, store)
@@ -116,7 +119,7 @@ describe('Multi tx', function () {
         const v1p = await tx2.getVertex(v1.offset)
         await tx2.addEdge(v1p, v4)
         const { root: currentRoot, index: currentIndex } = await tx2.commit({})
-        const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
+        const { baselineDelta } = deltaFactory({ linkCodec, valueCodec })
         const { vertices, edges } = await baselineDelta({
             baseRoot,
             baseIndex,

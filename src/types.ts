@@ -52,6 +52,12 @@ type PropRef = Ref & {}
 
 type IndexRef = Ref & {}
 
+type ValueRef = {
+    propRef: PropRef
+    ref: Ref
+    length: number
+}
+
 type Type = number & {}
 
 type VertexType = Type & {}
@@ -91,6 +97,8 @@ type RootStruct = {
     edgeOffset: number
     propRoot: Link
     propOffset: number
+    valueRoot: Link
+    valueOffset: number
     indexRoot: Link
     indexOffset: number
 }
@@ -99,6 +107,7 @@ type RootIndex = RootStruct & {
     vertexIndex: any
     edgeIndex: any
     propIndex: any
+    valueIndex: any
     indexIndex: any
 }
 
@@ -135,6 +144,7 @@ export {
     EdgeRef,
     PropRef,
     IndexRef,
+    ValueRef,
     Status,
     Type,
     VertexType,

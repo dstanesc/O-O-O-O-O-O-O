@@ -1,9 +1,4 @@
 import { protoGremlinFactory, ProtoGremlin } from './api/proto-gremlin'
-import {
-    v4 as uuidV4,
-    parse as uuidParse,
-    stringify as uuidStringify,
-} from 'uuid'
 import bent from 'bent'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from './chunking'
@@ -17,6 +12,8 @@ import {
     linkCodecFactory,
     BlockCodec,
     blockCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from './codecs'
 
 import { create as ipfsApi } from 'ipfs-http-client'
@@ -66,9 +63,10 @@ const str = (await stream.text()).trim()
 const lines = str.split(/\r?\n/g)
 
 async function publish() {
-    const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+    const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
     const blockCodec: BlockCodec = blockCodecFactory()
+    const valueCodec: ValueCodec = valueCodecFactory()
     const cache = {}
     const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
     const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
@@ -82,7 +80,7 @@ async function publish() {
     const g: ProtoGremlin = protoGremlinFactory({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
         versionStore,
     }).g()
@@ -132,18 +130,21 @@ async function publish() {
             .versionStoreRoot()
             .toString()}`
     )
+
+    // root=bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi, storeRoot=bafkreibtbm2c3qwdw64kir67ee3yipn5xi2wcpi2sqfwndg5z6wsqayyna
 }
 
 async function query() {
     const cache = {}
-    const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+    const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
+    const valueCodec: ValueCodec = valueCodecFactory()
     const blockCodec: BlockCodec = blockCodecFactory()
     const resolver = (cid: any) =>
         `http://192.168.1.205:8080/ipfs/${cid.toString()}`
     const blockStore = httpBlockStore({ cache, resolver })
     const versionRoot = linkCodec.parseString(
-        'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+        'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
     )
     const versionStore: VersionStore = await versionStoreFactory({
         readOnly: true,
@@ -157,25 +158,22 @@ async function query() {
     const g: ProtoGremlin = protoGremlinFactory({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
         versionStore,
     }).g()
 
     const { result: r1, time: t1 } = await queryVerse(g, 0, 'Rev', 22, 21)
 
-    console.log(r1)
-    console.log(t1)
+    console.log(r1, t1, 'ms')
 
     const { result: r2, time: t2 } = await queryVerse(g, 0, 'Gen', 1, 1)
 
-    console.log(r2)
-    console.log(t2)
+    console.log(r2, t2, 'ms')
 
     const { result: r3, time: t3 } = await queryVerse(g, 0, '1John', 5, 5)
 
-    console.log(r3)
-    console.log(t3)
+    console.log(r3, t3, 'ms')
 }
 
 async function queryVerse(
@@ -205,7 +203,6 @@ async function queryVerse(
     }
     const endTime = new Date().getTime()
     const time = endTime - startTime
-    console.log(`Query Time ${time} ms`)
     return { result: vr[0].value, time }
 }
 

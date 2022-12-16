@@ -11,6 +11,8 @@ import {
     BlockCodec,
     blockCodecFactory,
     multiBlockCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import { Graph } from '../graph'
 import { graphStore } from '../graph-store'
@@ -23,6 +25,7 @@ import { VersionStore, versionStoreFactory } from '../version-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 
@@ -65,7 +68,7 @@ describe('Indexing', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const indexStore = indexStoreFactory(blockStore)
 
         const graph = new Graph(story, store, indexStore)
@@ -226,16 +229,16 @@ describe('Indexing', function () {
 
         const g = new Graph(story, store, indexStore)
         blockStore.resetReads()
-        const vertexResults = []
+        const results = []
         for await (const result of navigateVertices(g, [v1.offset], request)) {
-            vertexResults.push(result)
+            results.push(result)
         }
 
-        assert.strictEqual(vertexResults.length, 1)
-        assert.strictEqual(vertexResults[0].offset, 1232)
-        assert.strictEqual(vertexResults[0].type, PropTypes.COMMENT)
-        assert.strictEqual(vertexResults[0].key, KeyTypes.TEXT)
-        assert.strictEqual(vertexResults[0].value, 'Comment v10')
+        assert.strictEqual(results.length, 1)
+        assert.strictEqual(results[0].offset, 704)
+        assert.strictEqual(results[0].type, PropTypes.COMMENT)
+        assert.strictEqual(results[0].key, KeyTypes.TEXT)
+        assert.strictEqual(results[0].value, 'Comment v10')
 
         const blocksLoaded = blockStore.countReads()
         assert.strictEqual(blocksLoaded, 10)

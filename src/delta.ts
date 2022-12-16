@@ -1,12 +1,22 @@
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
-import { BlockCodec, LinkCodec } from './codecs'
-import { Edge, Index, Link, Part, Prop, RootIndex, Vertex } from './types'
+import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
+import {
+    Edge,
+    Index,
+    Link,
+    Part,
+    Prop,
+    RootIndex,
+    ValueRef,
+    Vertex,
+} from './types'
 import { BlockStore } from './block-store'
 import {
     EdgeDecoder,
     IndexDecoder,
     OFFSET_INCREMENTS,
     PropDecoder,
+    PropValueDecoder,
     VertexDecoder,
 } from './serde'
 import fastEqual from 'fast-deep-equal/es6'
@@ -52,28 +62,47 @@ interface BaselineDelta {
 
 interface DeltaFactory {
     baselineDelta: BaselineDelta
-    baselineChangesRecords: ({
+    baselineChangesRecords: <T extends Part>({
         recordSize,
         baseRoot,
         baseIndex,
         baseStore,
+        baseValueRoot,
+        baseValueIndex,
         currentRoot,
         currentIndex,
         currentStore,
+        currentValueRoot,
+        currentValueIndex,
         recordsDecode,
     }: {
         recordSize: number
         baseRoot: Link
         baseIndex: any
         baseStore: BlockStore
+        baseValueRoot?: Link
+        baseValueIndex?: any
         currentRoot: Link
         currentIndex: any
         currentStore: BlockStore
-        recordsDecode: (
-            cidBytes: Uint8Array,
+        currentValueRoot: Link
+        currentValueIndex: any
+        recordsDecode: ({
+            bytes,
+            valueRoot,
+            valueIndex,
+            blockStore,
+        }: {
+            bytes: Uint8Array
+            valueRoot: Link
+            valueIndex: any
             blockStore: BlockStore
-        ) => Promise<Part[]>
-    }) => Promise<{ added: Map<number, Part>; updated: Map<number, Part> }>
+        }) => Promise<T[]>
+    }) => Promise<{
+        added: Map<number, T>
+        updated: Map<number, T>
+        updateBaseline: Map<number, T>
+    }>
 }
 
 interface Range {
@@ -118,13 +147,13 @@ const compactRanges = (recordSize: number, maxSize: number) => {
 
 const deltaFactory = ({
     linkCodec,
-    blockCodec,
+    valueCodec,
 }: {
     linkCodec: LinkCodec
-    blockCodec: BlockCodec
+    valueCodec: ValueCodec
 }): DeltaFactory => {
     const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodec
-    const { encode: blockEncode, decode: blockDecode }: BlockCodec = blockCodec
+    const { encode: valueEncode, decode: valueDecode }: ValueCodec = valueCodec
 
     const { read } = chunkyStore()
 
@@ -153,6 +182,9 @@ const deltaFactory = ({
             propRoot: basePropRoot,
             propOffset: basePropOffset,
             propIndex: basePropIndex,
+            valueRoot: baseValueRoot,
+            valueOffset: baseValueOffset,
+            valueIndex: baseValueIndex,
             indexRoot: baseIndexRoot,
             indexOffset: baseIndexOffset,
             indexIndex: baseIndexIndex,
@@ -168,6 +200,9 @@ const deltaFactory = ({
             propRoot: currentPropRoot,
             propOffset: currentPropOffset,
             propIndex: currentPropIndex,
+            valueRoot: currentValueRoot,
+            valueOffset: currentValueOffset,
+            valueIndex: currentValueIndex,
             indexRoot: currentIndexRoot,
             indexOffset: currentIndexOffset,
             indexIndex: currentIndexIndex,
@@ -182,11 +217,24 @@ const deltaFactory = ({
             baseRoot: baseVertexRoot,
             baseIndex: baseVertexIndex,
             baseStore,
+            baseValueRoot: undefined,
+            baseValueIndex: undefined,
             currentRoot: currentVertexRoot,
             currentIndex: currentVertexIndex,
             currentStore,
-            recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) =>
-                new VertexDecoder(bytes).read(),
+            currentValueRoot: undefined,
+            currentValueIndex: undefined,
+            recordsDecode: async ({
+                bytes,
+                valueRoot,
+                valueIndex,
+                blockStore,
+            }: {
+                bytes: Uint8Array
+                valueRoot: Link
+                valueIndex: any
+                blockStore: BlockStore
+            }) => new VertexDecoder(bytes).read(),
         })
 
         const {
@@ -198,11 +246,24 @@ const deltaFactory = ({
             baseRoot: baseEdgeRoot,
             baseIndex: baseEdgeIndex,
             baseStore,
+            baseValueRoot: undefined,
+            baseValueIndex: undefined,
             currentRoot: currentEdgeRoot,
             currentIndex: currentEdgeIndex,
             currentStore,
-            recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) =>
-                new EdgeDecoder(bytes).read(),
+            currentValueRoot: undefined,
+            currentValueIndex: undefined,
+            recordsDecode: async ({
+                bytes,
+                valueRoot,
+                valueIndex,
+                blockStore,
+            }: {
+                bytes: Uint8Array
+                valueRoot: Link
+                valueIndex: any
+                blockStore: BlockStore
+            }) => new EdgeDecoder(bytes).read(),
         })
 
         const {
@@ -214,16 +275,45 @@ const deltaFactory = ({
             baseRoot: basePropRoot,
             baseIndex: basePropIndex,
             baseStore,
+            baseValueRoot: baseValueRoot,
+            baseValueIndex: baseValueIndex,
             currentRoot: currentPropRoot,
             currentIndex: currentPropIndex,
             currentStore,
-            recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) =>
-                await new PropDecoder(
-                    bytes,
-                    linkDecode,
-                    blockDecode,
-                    blockStore.get
-                ).read(),
+            currentValueRoot: currentValueRoot,
+            currentValueIndex: currentValueIndex,
+            recordsDecode: async ({
+                bytes,
+                valueRoot,
+                valueIndex,
+                blockStore,
+            }: {
+                bytes: Uint8Array
+                valueRoot: Link
+                valueIndex: any
+                blockStore: BlockStore
+            }) => {
+                const valueGet = async (
+                    { root, index }: { root: Link; index: any },
+                    { propRef, ref, length }: ValueRef
+                ): Promise<Prop> => {
+                    const bytes = await read(ref, length, {
+                        root,
+                        index,
+                        decode: linkDecode,
+                        get: blockStore.get,
+                    })
+                    return new PropValueDecoder(bytes, valueDecode).readValue({
+                        propRef,
+                        ref,
+                        length,
+                    })
+                }
+
+                return await new PropDecoder(bytes, (ref: ValueRef) =>
+                    valueGet({ root: valueRoot, index: valueIndex }, ref)
+                ).read()
+            },
         })
 
         const {
@@ -232,14 +322,27 @@ const deltaFactory = ({
             updateBaseline: indicesBaseline,
         } = await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.PROP_INCREMENT,
-            baseRoot: basePropRoot,
-            baseIndex: basePropIndex,
+            baseRoot: baseIndexRoot,
+            baseIndex: baseIndexIndex,
             baseStore,
-            currentRoot: currentPropRoot,
-            currentIndex: currentPropIndex,
+            baseValueRoot: undefined,
+            baseValueIndex: undefined,
+            currentRoot: currentIndexRoot,
+            currentIndex: currentIndexIndex,
             currentStore,
-            recordsDecode: async (bytes: Uint8Array, blockStore: BlockStore) =>
-                await new IndexDecoder(bytes, linkDecode).read(),
+            currentValueRoot: undefined,
+            currentValueIndex: undefined,
+            recordsDecode: async ({
+                bytes,
+                valueRoot,
+                valueIndex,
+                blockStore,
+            }: {
+                bytes: Uint8Array
+                valueRoot: Link
+                valueIndex: any
+                blockStore: BlockStore
+            }) => await new IndexDecoder(bytes, linkDecode).read(),
         })
 
         return {
@@ -271,22 +374,37 @@ const deltaFactory = ({
         baseRoot,
         baseIndex,
         baseStore,
+        baseValueRoot,
+        baseValueIndex,
         currentRoot,
         currentIndex,
         currentStore,
+        currentValueRoot,
+        currentValueIndex,
         recordsDecode,
     }: {
         recordSize: number
         baseRoot: Link
         baseIndex: any
         baseStore: BlockStore
+        baseValueRoot?: Link
+        baseValueIndex?: any
         currentRoot: Link
         currentIndex: any
         currentStore: BlockStore
-        recordsDecode: (
-            cidBytes: Uint8Array,
+        currentValueRoot: Link
+        currentValueIndex: any
+        recordsDecode: ({
+            bytes,
+            valueRoot,
+            valueIndex,
+            blockStore,
+        }: {
+            bytes: Uint8Array
+            valueRoot: Link
+            valueIndex: any
             blockStore: BlockStore
-        ) => Promise<T[]>
+        }) => Promise<T[]>
     }): Promise<{
         added: Map<number, T>
         updated: Map<number, T>
@@ -350,10 +468,12 @@ const deltaFactory = ({
                     get: currentStore.get,
                 }
             )
-            const currentRecords: T[] = await recordsDecode(
-                currentRangeBytes,
-                currentStore
-            )
+            const currentRecords: T[] = await recordsDecode({
+                bytes: currentRangeBytes,
+                valueRoot: currentValueRoot,
+                valueIndex: currentValueIndex,
+                blockStore: currentStore,
+            })
 
             if (range.end <= baseByteArraySize) {
                 const baseRangeBytes = await read(
@@ -366,10 +486,12 @@ const deltaFactory = ({
                         get: baseStore.get,
                     }
                 )
-                const baseRecords: T[] = await recordsDecode(
-                    baseRangeBytes,
-                    baseStore
-                )
+                const baseRecords: T[] = await recordsDecode({
+                    bytes: baseRangeBytes,
+                    valueRoot: baseValueRoot,
+                    valueIndex: baseValueIndex,
+                    blockStore: baseStore,
+                })
                 for (let i = 0; i < currentRecords.length; i++) {
                     const currentRecord = currentRecords[i]
                     const baseRecord = baseRecords[i]
@@ -389,10 +511,12 @@ const deltaFactory = ({
                         get: baseStore.get,
                     }
                 )
-                const baseRecords: T[] = await recordsDecode(
-                    baseRangeBytes,
-                    baseStore
-                )
+                const baseRecords: T[] = await recordsDecode({
+                    bytes: baseRangeBytes,
+                    valueRoot: baseValueRoot,
+                    valueIndex: baseValueIndex,
+                    blockStore: baseStore,
+                })
                 for (let i = 0; i < baseRecords.length; i++) {
                     const currentRecord = currentRecords[i]
                     const baseRecord = baseRecords[i]

@@ -7,12 +7,15 @@ import {
     BlockCodec,
     blockCodecFactory,
     multiBlockCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import { Graph } from '../graph'
 import { graphStore } from '../graph-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 import * as assert from 'assert'
@@ -46,7 +49,7 @@ describe('Edge, fields computed on commit', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const graph = new Graph(story, store)
 
         const tx = graph.tx()

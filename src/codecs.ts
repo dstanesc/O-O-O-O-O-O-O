@@ -42,6 +42,21 @@ interface BlockCodec {
     ) => Promise<any>
 }
 
+interface ValueCodec {
+    encode: (value: any) => Uint8Array
+    decode: (valueBytes: Uint8Array) => any
+}
+
+const valueCodecFactory = (): ValueCodec => {
+    const encode = (value: any): Uint8Array => {
+        return pack(value) as Uint8Array
+    }
+    const decode = (valueBytes: Uint8Array): any => {
+        return unpack(valueBytes)
+    }
+    return { encode, decode }
+}
+
 const linkCodecFactory = (): LinkCodec => {
     const encode = async (blockBytes: Uint8Array): Promise<Link> => {
         const hash = await sha256.digest(blockBytes)
@@ -114,6 +129,9 @@ const multiBlockCodecFactory = (
 export {
     LinkCodec,
     BlockCodec,
+    ValueCodec,
+    SearchIndex,
+    valueCodecFactory,
     linkCodecFactory,
     blockCodecFactory,
     multiBlockCodecFactory,

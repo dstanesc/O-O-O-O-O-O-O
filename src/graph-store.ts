@@ -8,6 +8,8 @@ import {
     RootStruct,
     RootIndex,
     Index,
+    PropValue,
+    ValueRef,
 } from './types'
 
 import {
@@ -22,10 +24,12 @@ import {
     OFFSET_INCREMENTS,
     IndexDecoder,
     IndexEncoder,
+    PropValueEncoder,
+    PropValueDecoder,
 } from './serde'
 
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
-import { BlockCodec, LinkCodec } from './codecs'
+import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
 import { BlockStore } from './block-store'
 
 const { create, read, append, update, bulk, remove, readIndex } = chunkyStore()
@@ -33,18 +37,19 @@ const { create, read, append, update, bulk, remove, readIndex } = chunkyStore()
 const graphStore = ({
     chunk,
     linkCodec,
-    blockCodec,
+    valueCodec,
     blockStore,
 }: {
     chunk: (buffer: Uint8Array) => Uint32Array
     linkCodec: LinkCodec
-    blockCodec: BlockCodec
+    valueCodec: ValueCodec
     blockStore: BlockStore
 }) => {
     const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodec
-    const { encode: blockEncode, decode: blockDecode }: BlockCodec = blockCodec
+    const { encode: valueEncode, decode: valueDecode }: ValueCodec = valueCodec
     const { put: blockPut, get: blockGet } = blockStore
 
+    // FIXME - read larger chunks of data
     const vertexGet = async (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
@@ -84,12 +89,28 @@ const graphStore = ({
             decode: linkDecode,
             get: blockGet,
         })
-        return new PropDecoder(
-            bytes,
-            linkDecode,
-            blockDecode,
-            blockGet
+
+        return new PropDecoder(bytes, (ref: ValueRef) =>
+            valueGet({ root, index }, ref)
         ).readProp()
+    }
+
+    const valueGet = async (
+        { root, index }: { root: Link; index: RootIndex },
+        { propRef, ref, length }: ValueRef
+    ): Promise<Prop> => {
+        const { valueRoot, valueIndex } = index
+        const bytes = await read(ref, length, {
+            root: valueRoot,
+            index: valueIndex,
+            decode: linkDecode,
+            get: blockGet,
+        })
+        return new PropValueDecoder(bytes, valueDecode).readValue({
+            propRef,
+            ref,
+            length,
+        })
     }
 
     const indexGet = async (
@@ -157,7 +178,9 @@ const graphStore = ({
             decode: linkDecode,
             get: blockGet,
         })
-        return new PropDecoder(bytes, linkDecode, blockDecode, blockGet).read()
+        return new PropDecoder(bytes, (ref: ValueRef) =>
+            valueGet({ root, index }, ref)
+        ).read()
     }
 
     const offsetsGet = async ({
@@ -264,9 +287,12 @@ const graphStore = ({
         return { root, index, blocks }
     }
 
-    const propsCreate = async (props: Map<Offset, Prop>) => {
+    const propsCreate = async (
+        props: Map<Offset, Prop>,
+        refs: Map<Offset, ValueRef>
+    ) => {
         const array = Array.from(props.values())
-        const buf = await new PropEncoder(array, blockEncode, blockPut).write()
+        const buf = await new PropEncoder(array, refs).write()
         const { root, index, blocks } = await create({
             buf,
             chunk,
@@ -281,23 +307,19 @@ const graphStore = ({
         {
             added,
             updated,
-        }: { added: Map<number, Prop>; updated: Map<number, Prop> }
+        }: { added: Map<number, Prop>; updated: Map<number, Prop> },
+        refs: Map<Offset, ValueRef>
     ) => {
         const appendBuffer = await new PropEncoder(
             Array.from(added.values()),
-            blockEncode,
-            blockPut
+            refs
         ).write()
         const updateRequests: {
             updateBuffer: Uint8Array
             updateStartOffset: number
         }[] = []
         for (const [offset, prop] of updated) {
-            const updateBuffer = await new PropEncoder(
-                [prop],
-                blockEncode,
-                blockPut
-            ).write()
+            const updateBuffer = await new PropEncoder([prop], refs).write()
             updateRequests.push({ updateBuffer, updateStartOffset: offset })
         }
         const { root, index, blocks } = await bulk(
@@ -313,6 +335,51 @@ const graphStore = ({
         )
         for (const block of blocks) await blockPut(block)
         return { root, index, blocks }
+    }
+
+    const propsValueCreate = async (props: Map<Offset, Prop>) => {
+        const array = Array.from(props.values())
+        const { buf, refs } = new PropValueEncoder(
+            0,
+            array,
+            valueCodec.encode
+        ).write()
+        const { root, index, blocks } = await create({
+            buf,
+            chunk,
+            encode: linkEncode,
+        })
+        for (const block of blocks) await blockPut(block)
+        return { root, index, blocks, refs }
+    }
+
+    const propsValueAppend = async (
+        { root: rootOrig, index: indexOrig }: { root: Link; index: any },
+        {
+            added,
+            updated,
+        }: { added: Map<number, Prop>; updated: Map<number, Prop> }
+    ) => {
+        if (updated.size > 0)
+            throw new Error('property value update not implemented')
+        const lastOffset = indexOrig.indexStruct.byteArraySize
+        const { buf, refs } = new PropValueEncoder(
+            lastOffset,
+            Array.from(added.values()),
+            valueCodec.encode
+        ).write()
+
+        const { root, index, blocks } = await append(
+            {
+                root: rootOrig,
+                index: indexOrig,
+                decode: linkDecode,
+                get: blockGet,
+            },
+            { buf, chunk, encode: linkEncode }
+        )
+        for (const block of blocks) await blockPut(block)
+        return { root, index, blocks, refs }
     }
 
     const indicesCreate = async (indices: Map<Offset, Index>) => {
@@ -400,14 +467,30 @@ const graphStore = ({
               )
 
         const {
+            root: valueRootLink,
+            index: valueIndex,
+            blocks: valueBlocks,
+            refs: valueRefs,
+        } = rootOrig === undefined
+            ? await propsValueCreate(props.added)
+            : await propsValueAppend(
+                  {
+                      root: indexOrig.valueRoot,
+                      index: indexOrig.valueIndex,
+                  },
+                  props
+              )
+
+        const {
             root: propRootLink,
             index: propIndex,
             blocks: propBlocks,
         } = rootOrig === undefined
-            ? await propsCreate(props.added)
+            ? await propsCreate(props.added, valueRefs)
             : await propsBulk(
                   { root: indexOrig.propRoot, index: indexOrig.propIndex },
-                  props
+                  props,
+                  valueRefs
               )
 
         const {
@@ -430,6 +513,8 @@ const graphStore = ({
             edgeOffset: edgeIndex.indexStruct.byteArraySize,
             propRoot: propRootLink,
             propOffset: propIndex.indexStruct.byteArraySize,
+            valueRoot: valueRootLink,
+            valueOffset: valueIndex.indexStruct.byteArraySize,
             indexRoot: indexRootLink,
             indexOffset: indexIndex.indexStruct.byteArraySize,
         }
@@ -443,6 +528,7 @@ const graphStore = ({
         blocks.push(...vertexBlocks)
         blocks.push(...edgeBlocks)
         blocks.push(...propBlocks)
+        blocks.push(...valueBlocks)
         blocks.push(...indexBlocks)
         blocks.push(rootAfterBlock)
 
@@ -456,6 +542,9 @@ const graphStore = ({
             propRoot: propRootLink,
             propOffset: propIndex.indexStruct.byteArraySize,
             propIndex,
+            valueRoot: valueRootLink,
+            valueOffset: valueIndex.indexStruct.byteArraySize,
+            valueIndex,
             indexRoot: indexRootLink,
             indexOffset: indexIndex.indexStruct.byteArraySize,
             indexIndex,

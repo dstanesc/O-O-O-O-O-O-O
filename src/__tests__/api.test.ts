@@ -5,6 +5,8 @@ import {
     linkCodecFactory,
     blockCodecFactory,
     multiBlockCodecFactory,
+    valueCodecFactory,
+    ValueCodec,
 } from '../codecs'
 import { graphStore } from '../graph-store'
 import { chunkerFactory } from '../chunking'
@@ -25,6 +27,7 @@ import { VersionStore, versionStoreFactory } from '../version-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 
@@ -58,7 +61,7 @@ describe('Api', function () {
         const store = graphStore({
             chunk,
             linkCodec,
-            blockCodec: multiBlockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -99,7 +102,7 @@ describe('Api', function () {
         assert.equal(OFFSET_INCREMENTS.PROP_INCREMENT * 2, propOffset)
 
         assert.equal(
-            'bafkreiguifcsbkfb7jlxr7inlp5fqukmve7mv2po234jj73pp7nryvbcxu',
+            'bafkreihfd57xnxauil7q4cqr6hj5cnf4geer7pte2v54i7gaijw7lhkndu',
             root.toString()
         )
     })
@@ -133,7 +136,7 @@ describe('Api', function () {
         const gf: ProtoGremlinFactory = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec: multiBlockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         })
@@ -163,7 +166,7 @@ describe('Api', function () {
         console.log(root.toString())
 
         assert.equal(
-            'bafkreiguifcsbkfb7jlxr7inlp5fqukmve7mv2po234jj73pp7nryvbcxu',
+            'bafkreihfd57xnxauil7q4cqr6hj5cnf4geer7pte2v54i7gaijw7lhkndu',
             root.toString()
         )
     })
@@ -198,7 +201,7 @@ describe('Api', function () {
         const store = graphStore({
             chunk,
             linkCodec,
-            blockCodec: multiBlockCodec,
+            valueCodec,
             blockStore,
         })
         const graph = new Graph(story, store)
@@ -261,7 +264,7 @@ describe('Api', function () {
         assert.equal(OFFSET_INCREMENTS.PROP_INCREMENT * 4, propOffset)
 
         assert.equal(
-            'bafkreicklvs2aaeqfvs6f2pgcki2gont35chka2loq7mlah7yu4tj6bsvy',
+            'bafkreihahkgbiitsq6vew5utryjcknd4tfppi3feke7izcelwgs25xjv7q',
             root.toString()
         )
     })
@@ -298,7 +301,7 @@ describe('Api', function () {
         assert.equal(0, edgeResults[1].source)
         assert.equal(50, edgeResults[1].target)
         assert.equal(0, edgeResults[1].sourcePrev)
-        assert.equal(56, edgeResults[1].nextProp)
+        assert.equal(32, edgeResults[1].nextProp)
     })
 
     test('proto-schema aware creation, w/ navigation to vertex ', async () => {
@@ -346,11 +349,11 @@ describe('Api', function () {
 
         // first vertex
         assert.equal(25, vertexResults[0].offset)
-        assert.equal(112, vertexResults[0].nextProp)
+        assert.equal(64, vertexResults[0].nextProp)
 
         // second vertex
         assert.equal(50, vertexResults[1].offset)
-        assert.equal(280, vertexResults[1].nextProp)
+        assert.equal(160, vertexResults[1].nextProp)
     })
 
     test('proto-schema aware creation, w/ extraction of properties ', async () => {
@@ -429,7 +432,7 @@ describe('Api', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const graph = new Graph(story, store)
 
         const tx = graph.tx()
@@ -528,7 +531,7 @@ async function createSchemaAwareGraph() {
         blockCodec,
         blockStore,
     })
-    const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+    const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
     const graph = new Graph(story, store)
 
     const tx = graph.tx()

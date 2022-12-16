@@ -9,6 +9,8 @@ import {
     blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import {
     EdgeDecoder,
@@ -16,16 +18,28 @@ import {
     OFFSET_INCREMENTS,
     PropDecoder,
     PropEncoder,
+    PropValueDecoder,
+    PropValueEncoder,
     VertexDecoder,
     VertexEncoder,
 } from '../serde'
-import { Edge, Prop, Status, Vertex } from '../types'
+import {
+    Edge,
+    Link,
+    Offset,
+    Prop,
+    PropRef,
+    Status,
+    ValueRef,
+    Vertex,
+} from '../types'
 import { deltaFactory } from '../delta'
 
 const { create, read, append, update, remove, readIndex } = chunkyStore()
 const { chunk } = chunkerFactory(512, compute_chunks)
 
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
@@ -99,7 +113,7 @@ describe('Delta for', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         // baseline
 
@@ -148,7 +162,7 @@ describe('Delta for', function () {
 
         const { root: currentRoot, index: currentIndex } = await tx2.commit({})
 
-        const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
+        const { baselineDelta } = deltaFactory({ linkCodec, valueCodec })
 
         const { vertices, edges } = await baselineDelta({
             baseRoot,
@@ -189,18 +203,31 @@ const vertexTest = async (
         index: currentIndex,
         blocks: currentBlocks,
     } = current
-    const { baselineChangesRecords } = deltaFactory({ linkCodec, blockCodec })
-    const recordsDecode = async (bytes: Uint8Array) =>
-        new VertexDecoder(bytes).read()
+    const { baselineChangesRecords } = deltaFactory({ linkCodec, valueCodec })
+    const recordsDecode = async ({
+        bytes,
+        valueRoot,
+        valueIndex,
+        blockStore,
+    }: {
+        bytes: Uint8Array
+        valueRoot: Link
+        valueIndex: any
+        blockStore: BlockStore
+    }) => new VertexDecoder(bytes).read()
     const { added: addedFound, updated: updatedFound } =
         await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.VERTEX_INCREMENT,
             baseRoot,
             baseIndex,
             baseStore: blockStore,
+            baseValueRoot: undefined,
+            baseValueIndex: undefined,
             currentRoot,
             currentIndex,
             currentStore: blockStore,
+            currentValueRoot: undefined,
+            currentValueIndex: undefined,
             recordsDecode,
         })
 
@@ -229,18 +256,31 @@ const edgeTest = async (
         index: currentIndex,
         blocks: currentBlocks,
     } = current
-    const { baselineChangesRecords } = deltaFactory({ linkCodec, blockCodec })
-    const recordsDecode = async (bytes: Uint8Array) =>
-        new EdgeDecoder(bytes).read()
+    const { baselineChangesRecords } = deltaFactory({ linkCodec, valueCodec })
+    const recordsDecode = async ({
+        bytes,
+        valueRoot,
+        valueIndex,
+        blockStore,
+    }: {
+        bytes: Uint8Array
+        valueRoot: Link
+        valueIndex: any
+        blockStore: BlockStore
+    }) => new EdgeDecoder(bytes).read()
     const { added: addedFound, updated: updatedFound } =
         await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.EDGE_INCREMENT,
             baseRoot,
             baseIndex,
             baseStore: blockStore,
+            baseValueRoot: undefined,
+            baseValueIndex: undefined,
             currentRoot,
             currentIndex,
             currentStore: blockStore,
+            currentValueRoot: undefined,
+            currentValueIndex: undefined,
             recordsDecode,
         })
 
@@ -257,35 +297,62 @@ const propTest = async (
     update: number,
     increment: number
 ) => {
-    const { baseline, current, updated, added } = await propCollection(
-        size,
-        updatePos,
-        update,
-        increment
-    )
+    const { baseline, baselineValues, current, currentValues, updated, added } =
+        await propCollection(size, updatePos, update, increment)
     const { root: baseRoot, index: baseIndex, blocks: baseBlocks } = baseline
+    const { root: baseValueRoot, index: baseValueIndex } = baselineValues
     const {
         root: currentRoot,
         index: currentIndex,
         blocks: currentBlocks,
     } = current
-    const { baselineChangesRecords } = deltaFactory({ linkCodec, blockCodec })
-    const recordsDecode = async (bytes: Uint8Array) =>
-        new PropDecoder(
-            bytes,
-            linkCodec.decode,
-            blockCodec.decode,
-            blockStore.get
+    const { root: currentValueRoot, index: currentValueIndex } = currentValues
+    const { baselineChangesRecords } = deltaFactory({ linkCodec, valueCodec })
+    const recordsDecode = async ({
+        bytes,
+        valueRoot,
+        valueIndex,
+        blockStore,
+    }: {
+        bytes: Uint8Array
+        valueRoot: Link
+        valueIndex: any
+        blockStore: BlockStore
+    }) => {
+        const valueGet = async (
+            { root, index }: { root: Link; index: any },
+            { propRef, ref, length }: ValueRef
+        ): Promise<Prop> => {
+            const bytes = await read(ref, length, {
+                root,
+                index,
+                decode: linkCodec.decode,
+                get: blockStore.get,
+            })
+            return new PropValueDecoder(bytes, valueCodec.decode).readValue({
+                propRef,
+                ref,
+                length,
+            })
+        }
+        return new PropDecoder(bytes, (ref: ValueRef) =>
+            valueGet({ root: valueRoot, index: valueIndex }, ref)
         ).read()
+    }
+
     const { added: addedFound, updated: updatedFound } =
         await baselineChangesRecords({
             recordSize: OFFSET_INCREMENTS.PROP_INCREMENT,
             baseRoot,
             baseIndex,
             baseStore: blockStore,
+            baseValueRoot,
+            baseValueIndex,
             currentRoot,
             currentIndex,
             currentStore: blockStore,
+            currentValueRoot,
+            currentValueIndex,
             recordsDecode,
         })
 
@@ -412,7 +479,8 @@ const propCollection = async (
         }
         props.push(prop)
     }
-    const baseline = await propsCreate(props)
+    const baselineValues = await propsValueCreate(props)
+    const baseline = await propsCreate(props, baselineValues.refs)
 
     const updated = []
     for (let i = 0; i < update; i++) {
@@ -443,9 +511,11 @@ const propCollection = async (
         props.push(prop)
         added.push(prop)
     }
-    const current = await propsCreate(props)
 
-    return { baseline, current, updated, added }
+    const currentValues = await propsValueCreate(props)
+    const current = await propsCreate(props, currentValues.refs)
+
+    return { baseline, baselineValues, current, currentValues, updated, added }
 }
 
 const verticesCreate = async (array: Vertex[]) => {
@@ -470,12 +540,23 @@ const edgesCreate = async (array: Edge[]) => {
     return { root, index, blocks }
 }
 
-const propsCreate = async (array: Prop[]) => {
-    const buf = await new PropEncoder(
+const propsValueCreate = async (array: Prop[]) => {
+    const { buf, refs } = new PropValueEncoder(
+        0,
         array,
-        blockCodec.encode,
-        blockStore.put
+        valueCodec.encode
     ).write()
+    const { root, index, blocks } = await create({
+        buf,
+        chunk,
+        encode: linkCodec.encode,
+    })
+    for (const block of blocks) await blockStore.put(block)
+    return { root, index, blocks, refs }
+}
+
+const propsCreate = async (array: Prop[], refs: any) => {
+    const buf = await new PropEncoder(array, refs).write()
     const { root, index, blocks } = await create({
         buf,
         chunk,

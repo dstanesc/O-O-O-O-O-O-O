@@ -1,5 +1,5 @@
 import { Graph, Tx } from '../graph'
-import { LinkCodec, BlockCodec } from '../codecs'
+import { LinkCodec, BlockCodec, ValueCodec } from '../codecs'
 import { graphStore } from '../graph-store'
 import { BlockStore } from '../block-store'
 import { IndexStore } from '../index-store'
@@ -44,20 +44,20 @@ interface ProtoGremlinFactory {
 const protoGremlinFactory = ({
     chunk,
     linkCodec,
-    blockCodec,
+    valueCodec,
     blockStore,
     versionStore,
     indexStore,
 }: {
     chunk: (buffer: Uint8Array) => Uint32Array
     linkCodec: LinkCodec
-    blockCodec: BlockCodec
+    valueCodec: ValueCodec
     blockStore: BlockStore
     versionStore: VersionStore
     indexStore?: IndexStore
 }): ProtoGremlinFactory => {
     const g = (): ProtoGremlin => {
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const graph = new Graph(versionStore, store, indexStore)
         return new ProtoGremlin(graph)
     }

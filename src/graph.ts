@@ -738,7 +738,6 @@ class Tx implements ElementAccessor {
                 link,
                 type
             )
-            //console.log(`Index create ${JSON.stringify(index)}`)
             return index
         }
     }

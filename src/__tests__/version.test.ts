@@ -8,6 +8,8 @@ import {
     blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import * as assert from 'assert'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
@@ -41,6 +43,7 @@ enum KeyTypes {
 
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
@@ -56,7 +59,7 @@ describe('Version management', function () {
             blockStore,
         })
 
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         const graph = new Graph(story, store)
 
@@ -96,6 +99,10 @@ describe('Version management', function () {
             comment: 'First draft',
             tags: ['v0.0.1'],
         })
+
+        // const fileso = await query(original)
+
+        // console.log(fileso)
 
         /**
          * Revise original, first change
@@ -159,11 +166,11 @@ describe('Version management', function () {
 
         assert.strictEqual(
             linkCodec.encodeString(versions[0].root),
-            'bafkreif2txmmdltrndc3vfklvbmwm44wcmgylqhndza7lkmdoy2paztxbe'
+            'bafkreicwdw7eufain2py7aj6a7qmgy2ii5qq5nrhilwjocckrtnj3ljbqm'
         )
         assert.strictEqual(
             linkCodec.encodeString(versions[0].parent),
-            'bafkreicissoyj62zbsgybrwe4aa3473hb5jaugvnumgsvs7eqgrr4chnjy'
+            'bafkreia7homtnphv3je3iwlfl6y3gmdrqrakswsl5sqpcw3gfz25wyfm4q'
         )
         assert.strictEqual(versions[0].comment, 'First release')
         assert.strictEqual(versions[0].tags.length, 1)
@@ -171,11 +178,11 @@ describe('Version management', function () {
 
         assert.strictEqual(
             linkCodec.encodeString(versions[1].root),
-            'bafkreicissoyj62zbsgybrwe4aa3473hb5jaugvnumgsvs7eqgrr4chnjy'
+            'bafkreia7homtnphv3je3iwlfl6y3gmdrqrakswsl5sqpcw3gfz25wyfm4q'
         )
         assert.strictEqual(
             linkCodec.encodeString(versions[1].parent),
-            'bafkreieih7e4qw6flxpjp6yzruagcoaypxp4zyyk2lnlzpgirxqye4iuya'
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[1].comment, 'Second draft')
         assert.strictEqual(versions[1].tags.length, 1)
@@ -183,7 +190,7 @@ describe('Version management', function () {
 
         assert.strictEqual(
             linkCodec.encodeString(versions[2].root),
-            'bafkreieih7e4qw6flxpjp6yzruagcoaypxp4zyyk2lnlzpgirxqye4iuya'
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[2].parent, undefined)
         assert.strictEqual(versions[2].comment, 'First draft')
@@ -210,7 +217,7 @@ describe('Version management', function () {
             blockStore,
         })
 
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         const graph = new Graph(story, store)
 
@@ -364,11 +371,11 @@ describe('Version management', function () {
 
         assert.strictEqual(
             linkCodec.encodeString(versions[0].root),
-            'bafkreifwx74exl2dkwfp2leblmpzx6fbnayeamv4q775bmou22fufbbgbi'
+            'bafkreigx63iqmw743rxhlxpkz3ge5zdid2qnpxl7vujgyu2eftmhoasnqa'
         )
         assert.strictEqual(
             linkCodec.encodeString(versions[0].parent),
-            'bafkreieih7e4qw6flxpjp6yzruagcoaypxp4zyyk2lnlzpgirxqye4iuya'
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[0].comment, 'Second release')
         assert.strictEqual(versions[0].tags.length, 1)
@@ -376,7 +383,7 @@ describe('Version management', function () {
 
         assert.strictEqual(
             linkCodec.encodeString(versions[3].root),
-            'bafkreieih7e4qw6flxpjp6yzruagcoaypxp4zyyk2lnlzpgirxqye4iuya'
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[3].parent, undefined)
         assert.strictEqual(versions[3].comment, 'First draft')
@@ -393,7 +400,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         blockCodec,
         blockStore,
     })
-    const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+    const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
     const graph = new Graph(versionStore, store)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)

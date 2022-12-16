@@ -13,6 +13,9 @@ import {
     Part,
     Version,
     Tag,
+    Offset,
+    ValueRef,
+    PropRef,
 } from './types'
 
 const REF_EXISTS = 0x1
@@ -447,44 +450,39 @@ class EdgeDecoder extends BinaryDecoder {
     }
 }
 
-const PROP_SIZE_BYTES = 56
+const PROP_SIZE_BYTES = 32
 
 class PropEncoder extends BinaryEncoder {
     props: Prop[]
-    blockEncode: (
-        json: any,
-        blockPut: (block: Block) => Promise<void>
-    ) => Promise<Link>
-    blockPut: (block: Block) => Promise<void>
-    constructor(
-        props: Prop[],
-        blockEncode: (
-            json: any,
-            blockPut: (block: Block) => Promise<void>
-        ) => Promise<Link>,
-        blockPut: (block: Block) => Promise<void>
-    ) {
+    refs: Map<PropRef, ValueRef>
+    constructor(props: Prop[], refs: Map<PropRef, ValueRef>) {
         super(props.length * PROP_SIZE_BYTES)
         this.props = props
-        this.blockEncode = blockEncode
-        this.blockPut = blockPut
+        this.refs = refs
     }
 
-    async writeValue(value: PropValue) {
-        // 36
-        const link: Link = await this.blockEncode(value, this.blockPut)
-        this.writeLink(link) // 36
+    async writeValue(propRef: PropRef, value: PropValue) {
+        // 13
+        const valueRef: ValueRef = this.refs.get(propRef)
+        this.writeOffset(propRef) // 4
+        if (valueRef !== undefined) {
+            this.writeRef(valueRef.ref) // 5
+            this.writeUInt(valueRef.length) // 4
+        } else {
+            this.skipRef()
+            this.skipUInt()
+        }
     }
 
     async writeProp(prop: Prop) {
-        // 56
+        // 32
         this.writeOffset(prop.offset) // 4
         if (prop.type !== undefined)
             // 5
             this.writeType(prop.type)
         else this.skipType()
-        this.writeType(prop.key) // 5
-        await this.writeValue(prop.value) // 36
+        this.writeUInt(prop.key) // 4
+        await this.writeValue(prop.offset, prop.value) // 9
         if (prop.nextProp !== undefined)
             // 5
             this.writeRef(prop.nextProp)
@@ -499,41 +497,35 @@ class PropEncoder extends BinaryEncoder {
 }
 
 class PropDecoder extends BinaryDecoder {
-    linkDecode: (linkBytes: Uint8Array) => Link
-    blockDecode: (
-        link: Link,
-        blockGet: (cid: any) => Promise<Uint8Array>
-    ) => Promise<PropValue>
-    blockGet: (cid: any) => Promise<Uint8Array>
-
+    valueGet: (ref: ValueRef) => Promise<PropValue>
     constructor(
         buffer: Uint8Array,
-        linkDecode: (linkBytes: Uint8Array) => Link,
-        blockDecode: (
-            link: Link,
-            blockGet: (cid: any) => Promise<Uint8Array>
-        ) => Promise<PropValue>,
-        blockGet: (cid: any) => Promise<Uint8Array>
+        valueGet: (ref: ValueRef) => Promise<PropValue>
     ) {
         super(buffer)
-        this.linkDecode = linkDecode
-        this.blockDecode = blockDecode
-        this.blockGet = blockGet
+        this.valueGet = valueGet
     }
 
     async readPropValue(): Promise<PropValue> {
-        const link: Link = this.readLink(this.linkDecode)
-        const propValue: PropValue = await this.blockDecode(link, this.blockGet)
-        return propValue
+        const propRef = this.readOffset()
+        const ref = this.readRef()
+        if (ref !== undefined) {
+            const length = this.readUInt()
+            const valueRef: ValueRef = { propRef, ref, length }
+            return await this.valueGet(valueRef)
+        } else {
+            this.skipUInt()
+            return undefined
+        }
     }
 
     async readProp(): Promise<Prop> {
-        const offset = this.readOffset()
-        const type = this.readType()
-        const key = this.readType()
-        const value = await this.readPropValue()
-        const nextProp = this.readRef()
-        const status = this.readStatus()
+        const offset = this.readOffset() //4
+        const type = this.readType() //5
+        const key = this.readUInt() //4
+        const value = await this.readPropValue() // 13
+        const nextProp = this.readRef() //5
+        const status = this.readStatus() //1
         const prop: Prop = { status, offset, key, value }
         if (type !== undefined) prop.type = type
         if (nextProp !== undefined) prop.nextProp = nextProp
@@ -552,6 +544,67 @@ class PropDecoder extends BinaryDecoder {
     }
 }
 
+class PropValueEncoder extends BinaryEncoder {
+    props: Prop[]
+    valueEncode: (json: any) => Uint8Array
+    refOffset: number
+    constructor (refOffset: number, props: Prop[], valueEncode: (json: any) => Uint8Array) {
+        super(
+            props
+                .map((prop) => valueEncode(prop.value).byteLength)
+                .reduce((a, b) => a + b, 0)
+        )
+        this.refOffset = refOffset
+        this.props = props
+        this.valueEncode = valueEncode
+    }
+
+    writeValue(propRef: Ref, value: PropValue): ValueRef {
+        const bytes: Uint8Array = this.valueEncode(value)
+        const ref = this.cursor + this.refOffset
+        const length = bytes.byteLength
+        this.writeBytes(bytes)
+        return { propRef, ref, length }
+    }
+
+    writeProp(prop: Prop): ValueRef {
+        const valueRef: ValueRef = this.writeValue(prop.offset, prop.value)
+        return valueRef
+    }
+
+    write(): { buf: Uint8Array; refs: Map<PropRef, ValueRef> } {
+        const refs: Map<PropRef, ValueRef> = new Map()
+        for (const prop of this.props) {
+            const valueRef: ValueRef = this.writeProp(prop)
+            refs.set(prop.offset, valueRef)
+        }
+        const buf = this.content()
+        return { buf, refs }
+    }
+}
+
+class PropValueDecoder extends BinaryDecoder {
+    valueDecode: (bytes: Uint8Array) => any
+    constructor(buffer: Uint8Array, valueDecode: (bytes: Uint8Array) => any) {
+        super(buffer)
+        this.valueDecode = valueDecode
+    }
+
+    readValue(valueRef: ValueRef): PropValue {
+        const bytes = this.readBytes(valueRef.length)
+        return this.valueDecode(bytes)
+    }
+
+    read(valueRefs: ValueRef[]): Map<PropRef, PropValue> {
+        const values: Map<PropRef, PropValue> = new Map()
+        for (const valueRef of valueRefs) {
+            const value = this.readValue(valueRef)
+            values.set(valueRef.propRef, value)
+        }
+        return values
+    }
+}
+
 const INDEX_SIZE_BYTES = 56
 
 class IndexEncoder extends BinaryEncoder {
@@ -562,7 +615,7 @@ class IndexEncoder extends BinaryEncoder {
     }
 
     async writeIndex(index: Index) {
-        // 92
+        // 56
         this.writeOffset(index.offset) // 4
         if (index.type !== undefined)
             // 5
@@ -632,6 +685,8 @@ class RootEncoder extends BinaryEncoder {
     edgeOffset: number // 4
     propRoot: Link // 36
     propOffset: number // 4
+    valueRoot: Link // 36
+    valueOffset: number // 4
     indexRoot: Link // 36
     indexOffset: number // 4
 
@@ -642,6 +697,8 @@ class RootEncoder extends BinaryEncoder {
         edgeOffset,
         propRoot,
         propOffset,
+        valueRoot,
+        valueOffset,
         indexRoot,
         indexOffset,
     }: {
@@ -651,16 +708,20 @@ class RootEncoder extends BinaryEncoder {
         edgeOffset: number
         propRoot: Link
         propOffset: number
+        valueRoot: Link
+        valueOffset: number
         indexRoot: Link
         indexOffset: number
     }) {
-        super(160)
+        super(200)
         this.vertexRoot = vertexRoot
         this.vertexOffset = vertexOffset
         this.edgeRoot = edgeRoot
         this.edgeOffset = edgeOffset
         this.propRoot = propRoot
         this.propOffset = propOffset
+        this.valueRoot = valueRoot
+        this.valueOffset = valueOffset
         this.indexRoot = indexRoot
         this.indexOffset = indexOffset
     }
@@ -669,10 +730,12 @@ class RootEncoder extends BinaryEncoder {
         this.writeUInt(this.vertexOffset) //4
         this.writeUInt(this.edgeOffset) //4
         this.writeUInt(this.propOffset) //4
+        this.writeUInt(this.valueOffset) //4
         this.writeUInt(this.indexOffset) //4
         this.writeLink(this.vertexRoot as Link) //36
         this.writeLink(this.edgeRoot as Link) //36
         this.writeLink(this.propRoot as Link) //36
+        this.writeLink(this.valueRoot as Link) //36
         this.writeLink(this.indexRoot as Link) //36
         return this
     }
@@ -691,16 +754,20 @@ class RootDecoder extends BinaryDecoder {
         edgeOffset: number
         propRoot: Link
         propOffset: number
+        valueRoot: Link
+        valueOffset: number
         indexRoot: Link
         indexOffset: number
     } {
         const vertexOffset = this.readOffset()
         const edgeOffset = this.readOffset()
         const propOffset = this.readOffset()
+        const valueOffset = this.readOffset()
         const indexOffset = this.readOffset()
         const vertexRoot = this.readLink(this.linkDecode)
         const edgeRoot = this.readLink(this.linkDecode)
         const propRoot = this.readLink(this.linkDecode)
+        const valueRoot = this.readLink(this.linkDecode)
         const indexRoot = this.readLink(this.linkDecode)
         return {
             vertexRoot,
@@ -709,6 +776,8 @@ class RootDecoder extends BinaryDecoder {
             edgeOffset,
             propRoot,
             propOffset,
+            valueRoot,
+            valueOffset,
             indexRoot,
             indexOffset,
         }
@@ -863,6 +932,8 @@ export {
     EdgeDecoder,
     PropEncoder,
     PropDecoder,
+    PropValueEncoder,
+    PropValueDecoder,
     IndexEncoder,
     IndexDecoder,
     RootEncoder,

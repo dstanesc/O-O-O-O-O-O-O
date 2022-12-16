@@ -48,9 +48,10 @@ const blockIndexFactory = ({
         const vertexIndex = await buildChunkyIndex(rootStruct.vertexRoot)
         const edgeIndex = await buildChunkyIndex(rootStruct.edgeRoot)
         const propIndex = await buildChunkyIndex(rootStruct.propRoot)
+        const valueIndex = await buildChunkyIndex(rootStruct.valueRoot)
         const indexIndex = await buildChunkyIndex(rootStruct.indexRoot)
         const index = Object.assign(
-            { vertexIndex, edgeIndex, propIndex, indexIndex },
+            { vertexIndex, edgeIndex, propIndex, valueIndex, indexIndex },
             rootStruct
         )
         return { root, index }

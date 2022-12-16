@@ -8,6 +8,8 @@ import {
     blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import * as assert from 'assert'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
@@ -41,6 +43,7 @@ enum KeyTypes {
 
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
@@ -56,7 +59,7 @@ describe('Merge graphs', function () {
             blockStore,
         })
 
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         const graph = new Graph(story, store)
 
@@ -98,7 +101,7 @@ describe('Merge graphs', function () {
          * Revise original, first user
          */
 
-        const store1 = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store1 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const g1 = new Graph(story, store1)
 
         const tx1 = g1.tx()
@@ -126,7 +129,7 @@ describe('Merge graphs', function () {
          */
         story.checkout(original)
 
-        const store2 = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store2 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const g2 = new Graph(story, store2)
 
         const tx2 = g2.tx()
@@ -169,6 +172,7 @@ describe('Merge graphs', function () {
             MergePolicyEnum.MultiValueRegistry,
             chunk,
             linkCodec,
+            valueCodec,
             blockCodec
         )
 
@@ -202,6 +206,7 @@ describe('Merge graphs', function () {
             MergePolicyEnum.LastWriterWins,
             chunk,
             linkCodec,
+            valueCodec,
             blockCodec
         )
 
@@ -224,7 +229,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         blockCodec,
         blockStore,
     })
-    const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+    const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
     const graph = new Graph(versionStore, store)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)

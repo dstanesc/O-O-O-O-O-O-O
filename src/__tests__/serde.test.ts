@@ -3,9 +3,11 @@ import {
     blockCodecFactory,
     LinkCodec,
     BlockCodec,
+    valueCodecFactory,
+    ValueCodec,
 } from '../codecs'
 import { memoryBlockStoreFactory } from '../block-store'
-import { Version, Edge, Index, Prop, Status, Vertex } from '../types'
+import { Version, Edge, Index, Prop, Status, Vertex, ValueRef } from '../types'
 import {
     EdgeDecoder,
     EdgeEncoder,
@@ -17,6 +19,8 @@ import {
     PropEncoder,
     VertexDecoder,
     VertexEncoder,
+    PropValueEncoder,
+    PropValueDecoder,
 } from '../serde'
 import * as assert from 'assert'
 import { CID } from 'multiformats/cid'
@@ -24,6 +28,8 @@ import { CID } from 'multiformats/cid'
 const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodecFactory()
 const { encode: blockEncode, decode: blockDecode }: BlockCodec =
     blockCodecFactory()
+const { encode: valueEncode, decode: valueDecode }: ValueCodec =
+    valueCodecFactory()
 const { put: blockPut, get: blockGet } = memoryBlockStoreFactory()
 
 describe('Serde validation with', function () {
@@ -107,17 +113,19 @@ describe('Serde validation with', function () {
             value: 'Hello World',
             nextProp: 888,
         }
-        const bytes = await new PropEncoder(
+        const { refs, buf } = new PropValueEncoder(
+            0,
             [p1, p2, p3],
-            blockEncode,
-            blockPut
+            valueEncode
         ).write()
-        const props = await new PropDecoder(
-            bytes,
-            linkDecode,
-            blockDecode,
-            blockGet
-        ).read()
+
+        const bytes = await new PropEncoder([p1, p2, p3], refs).write()
+        const props = await new PropDecoder(bytes, (valueRef: ValueRef) => {
+            const decoder = new PropValueDecoder(buf, valueDecode)
+            decoder.skipBytes(valueRef.ref)
+            return decoder.readValue(valueRef)
+        }).read()
+
         assert.deepEqual([p1, p2, p3], props)
     })
 

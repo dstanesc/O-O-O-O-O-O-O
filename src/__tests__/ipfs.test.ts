@@ -10,6 +10,8 @@ import {
     linkCodecFactory,
     BlockCodec,
     blockCodecFactory,
+    valueCodecFactory,
+    ValueCodec,
 } from '../codecs'
 import { eq } from '../ops'
 import * as assert from 'assert'
@@ -71,12 +73,13 @@ describe('IPFS block-store', function () {
         test('bible quick scan, retrieve verse - Gen 1 1', async () => {
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
-            const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+            const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
+            const valueCodec: ValueCodec = valueCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
             const versionRoot = linkCodec.parseString(
-                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+                'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
             )
             const versionStore: VersionStore = await versionStoreFactory({
                 versionRoot,
@@ -89,7 +92,7 @@ describe('IPFS block-store', function () {
             const g: ProtoGremlin = protoGremlinFactory({
                 chunk,
                 linkCodec,
-                blockCodec,
+                valueCodec,
                 blockStore,
                 versionStore,
             }).g()
@@ -106,12 +109,13 @@ describe('IPFS block-store', function () {
         test('bible full scan, retrieve verse - Rev 22 21', async () => {
             const cache = {}
             const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
-            const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+            const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
+            const valueCodec: ValueCodec = valueCodecFactory()
             const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
             const versionRoot = linkCodec.parseString(
-                'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
+                'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
             )
             const versionStore: VersionStore = await versionStoreFactory({
                 versionRoot,
@@ -124,7 +128,7 @@ describe('IPFS block-store', function () {
             const g: ProtoGremlin = protoGremlinFactory({
                 chunk,
                 linkCodec,
-                blockCodec,
+                valueCodec,
                 blockStore,
                 versionStore,
             }).g()

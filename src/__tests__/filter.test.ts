@@ -3,6 +3,8 @@ import {
     blockCodecFactory,
     BlockCodec,
     LinkCodec,
+    valueCodecFactory,
+    ValueCodec,
 } from '../codecs'
 import { graphStore } from '../graph-store'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
@@ -38,6 +40,7 @@ describe('Filter data', function () {
 
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
@@ -46,7 +49,7 @@ describe('Filter data', function () {
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
         const graph = new Graph(story, store)
 
@@ -131,6 +134,7 @@ describe('Filter data', function () {
 
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -143,7 +147,7 @@ describe('Filter data', function () {
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()
@@ -203,6 +207,7 @@ describe('Filter data', function () {
 
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -215,7 +220,7 @@ describe('Filter data', function () {
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()

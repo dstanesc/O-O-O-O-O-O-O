@@ -3,6 +3,8 @@ import {
     blockCodecFactory,
     BlockCodec,
     LinkCodec,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import { graphStore } from '../graph-store'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
@@ -21,6 +23,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
             chunk,
@@ -28,7 +31,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const graph = new Graph(story, store)
 
         const tx = graph.tx()
@@ -48,7 +51,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { root } = await tx.commit({})
 
         assert.equal(
-            'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
+            'bafkreib5ma2hntxxmizkpnqjum6b2glrj5p3grfbzotvfq7xrvuraxzria',
             root.toString()
         )
     })
@@ -56,6 +59,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
     test('proto-gremlin api creation', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -68,7 +72,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()
@@ -89,7 +93,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { root } = await tx.commit({})
 
         assert.equal(
-            'bafkreia6mi6w4iukhulm7qldemwiiep4gyp3pkpdngkkqvmdbvlcvd35ra',
+            'bafkreib5ma2hntxxmizkpnqjum6b2glrj5p3grfbzotvfq7xrvuraxzria',
             root.toString()
         )
     })
@@ -97,6 +101,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
     test('internal api navigate', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
@@ -105,7 +110,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
             blockCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
         const graph = new Graph(story, store)
 
         const tx = graph.tx()
@@ -151,6 +156,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
     test('proto-gremlin api navigate', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -163,7 +169,7 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()

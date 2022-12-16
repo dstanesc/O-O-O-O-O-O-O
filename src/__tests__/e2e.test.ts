@@ -14,6 +14,8 @@ import {
     linkCodecFactory,
     BlockCodec,
     blockCodecFactory,
+    ValueCodec,
+    valueCodecFactory,
 } from '../codecs'
 import { indexStoreFactory } from '../index-store-factory'
 import { eq } from '../ops'
@@ -51,15 +53,16 @@ enum IndexTypes {
 }
 
 describe('e2e ', function () {
-    test('full bible, 7MB json, no index, load, pushx and navigate', async () => {
+    test('full bible, 7MB json, no index, load and navigate e2ex', async () => {
         const stream = await getStream(
             '/bibleapi/bibleapi-bibles-json/master/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
 
-        const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -72,7 +75,7 @@ describe('e2e ', function () {
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()
@@ -120,7 +123,7 @@ describe('e2e ', function () {
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
         }).g()
@@ -179,7 +182,7 @@ describe('e2e ', function () {
         const g3: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore: blockStore2,
             versionStore: versionStore2,
         }).g()
@@ -204,15 +207,16 @@ describe('e2e ', function () {
         assert.strictEqual(blockStore.size(), blockStore2.size())
     })
 
-    test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {
+    test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate e2ex', async () => {
         const stream = await getStream(
             '/bibleapi/bibleapi-bibles-json/master/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
 
-        const { chunk } = chunkerFactory(1024 * 16, compute_chunks)
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
         const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
@@ -225,7 +229,7 @@ describe('e2e ', function () {
         const g: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
             indexStore,
@@ -291,7 +295,7 @@ describe('e2e ', function () {
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
             versionStore,
             indexStore,

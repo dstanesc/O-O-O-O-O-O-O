@@ -4,7 +4,7 @@ import { Link, Part, Vertex, Edge, Prop, RootIndex } from './types'
 import { BaselineDelta, deltaFactory, DeltaFactory } from './delta'
 import { Graph, Tx } from './graph'
 import { blockIndexFactory } from './block-index'
-import { BlockCodec, LinkCodec } from './codecs'
+import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
 import { graphStore } from './graph-store'
 import { OFFSET_INCREMENTS } from './serde'
 import { VersionStore, versionStoreFactory } from './version-store'
@@ -154,7 +154,8 @@ const merge = async (
     policy: MergePolicyEnum,
     chunk: (buffer: Uint8Array) => Uint32Array,
     linkCodec: LinkCodec,
-    blockCodec: BlockCodec
+    valueCodec: ValueCodec,
+    blockCodec: BlockCodec,
 ) => {
     const mergeOrder = <T>({ current, other }: { current: T; other: T }) => {
         return currentRoot.bytes[0] < otherRoot.bytes[0]
@@ -175,7 +176,7 @@ const merge = async (
             throw new Error(`Unknown merge policy ${policy}`)
     }
 
-    const { baselineDelta } = deltaFactory({ linkCodec, blockCodec })
+    const { baselineDelta } = deltaFactory({ linkCodec, valueCodec })
 
     const { buildRootIndex: buildBaseIndex } = blockIndexFactory({
         linkCodec,
@@ -230,7 +231,7 @@ const merge = async (
     const store = graphStore({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore: firstStore,
     })
     const graph = new Graph(story, store)
