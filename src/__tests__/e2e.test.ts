@@ -1,7 +1,7 @@
 import { protoGremlinFactory, ProtoGremlin } from '../api/proto-gremlin'
 import * as assert from 'assert'
 import bent from 'bent'
-import { VertexRef } from '../types'
+import { Prop, VertexRef } from '../types'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
 import {
@@ -53,7 +53,7 @@ enum IndexTypes {
 }
 
 describe('e2e ', function () {
-    test('full bible, 7MB json, no index, load and navigate e2ex', async () => {
+    test('full bible, 7MB json, no index, load and navigate', async () => {
         const stream = await getStream(
             '/bibleapi/bibleapi-bibles-json/master/kjv.json'
         )
@@ -187,7 +187,6 @@ describe('e2e ', function () {
             versionStore: versionStore2,
         }).g()
 
-
         const first2 = await queryVerse(g3, bible.offset, 'Gen', 1, 1)
 
         assert.equal(
@@ -205,9 +204,104 @@ describe('e2e ', function () {
         console.log(`BlockStore2 total size = ${blockStore2.size()}`)
 
         assert.strictEqual(blockStore.size(), blockStore2.size())
+
+        const books = await queryBooks(g3, bible.offset)
+
+        console.log('Books', books)
     })
 
-    test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate e2ex', async () => {
+    test('full bible, 7MB json, no index, query first level', async () => {
+        const stream = await getStream(
+            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+        )
+        const str = (await stream.text()).trim()
+        const lines = str.split(/\r?\n/g)
+
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockCodec: BlockCodec = blockCodecFactory()
+        const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
+
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+            versionStore,
+        }).g()
+
+        const tx = await g.tx()
+
+        const bible = await tx.addV(ObjectTypes.ROOT).next()
+
+        let book: any, book_id: string
+        let chapter: any, chapter_id: number
+        let verse: any, verse_id: number
+
+        for (const line of lines) {
+            const entry = JSON.parse(line)
+            if (book === undefined || book_id !== entry.book_id) {
+                book = await tx
+                    .addV(ObjectTypes.BOOK)
+                    .property(KeyTypes.ID, entry.book_id, PropTypes.ANY)
+                    .property(KeyTypes.NAME, entry.book_name, PropTypes.ANY)
+                    .next()
+                book_id = entry.book_id
+                await tx.addE(RlshpTypes.book).from(bible).to(book).next()
+            }
+            if (chapter === undefined || chapter_id !== entry.chapter) {
+                chapter = await tx
+                    .addV(ObjectTypes.CHAPTER)
+                    .property(KeyTypes.ID, entry.chapter, PropTypes.ANY)
+                    .next()
+                chapter_id = entry.chapter
+                await tx.addE(RlshpTypes.chapter).from(book).to(chapter).next()
+            }
+            if (verse === undefined || verse_id !== entry.verse) {
+                verse = await tx
+                    .addV(ObjectTypes.VERSE)
+                    .property(KeyTypes.ID, entry.verse, PropTypes.ANY)
+                    .property(KeyTypes.TEXT, entry.text, PropTypes.ANY)
+                    .next()
+                verse_id = entry.verse
+                await tx.addE(RlshpTypes.verse).from(chapter).to(verse).next()
+            }
+        }
+
+        const { root, index, blocks } = await tx.commit({})
+
+        const books = await queryBooks(g, bible.offset)
+
+        const expected = [
+            'Gen',   'Exod',   'Lev',    'Num',   'Deut',
+            'Josh',  'Judg',   'Ruth',   '1Sam',  '2Sam',
+            '1Kgs',  '2Kgs',   '1Chr',   '2Chr',  'Ezra',
+            'Neh',   'Esth',   'Job',    'Ps',    'Prov',
+            'Eccl',  'Song',   'Isa',    'Jer',   'Lam',
+            'Ezek',  'Dan',    'Hos',    'Joel',  'Amos',
+            'Obad',  'Jona',   'Mic',    'Nah',   'Hab',
+            'Zeph',  'Hag',    'Zech',   'Mal',   'Matt',
+            'Mark',  'Luke',   'John',   'Acts',  'Rom',
+            '1Cor',  '2Cor',   'Gal',    'Eph',   'Phil',
+            'Col',   '1Thess', '2Thess', '1Tim',  '2Tim',
+            'Titus', 'Phlm',   'Heb',    'Jas',   '1Pet',
+            '2Pet',  '1John',  '2John',  '3John', 'Jude',
+            'Rev'
+          ]
+
+        console.log('Books', books)
+
+        assert.deepStrictEqual(books, expected)
+    })
+
+    test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {
         const stream = await getStream(
             '/bibleapi/bibleapi-bibles-json/master/kjv.json'
         )
@@ -366,4 +460,17 @@ async function queryVerse(
     console.log(`Query Time ${endTime - startTime} ms`)
 
     return vr[0].value
+}
+
+async function queryBooks(g: ProtoGremlin, rootOffset: VertexRef) {
+    const books = []
+    for await (const result of g
+        .V([rootOffset])
+        .out(RlshpTypes.book)
+        .hasType(ObjectTypes.BOOK)
+        .values(KeyTypes.ID)
+        .exec()) {
+        books.push((result as Prop).value)
+    }
+    return books
 }
