@@ -1,11 +1,20 @@
 {
     "name": "@dstanesc/o-o-o-o-o-o-o",
-    "description": "O-O-O-O-O-O-O is content addressed persistence for graph-like structures",
-    "version": "0.0.1",
+    "description": "O-O-O-O-O-O-O is content addressed persistence for graph structures",
+    "version": "0.0.2",
     "homepage": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "repository": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "license": "(Apache-2.0 AND MIT)",
     "author": "dstanesc <dstanesc@gmail.com>",
+    "keywords": [
+        "ipfs",
+        "s3",
+        "content-addressed",
+        "immutable",
+        "persistence",
+        "graph",
+        "content-defined-chunking"
+    ],
     "type": "module",
     "main": "./dist/index.js",
     "module": "./dist/index.js",

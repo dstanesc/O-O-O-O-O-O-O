@@ -1,16 +1,16 @@
 # O-O-O-O-O-O-O
 
-![](./img/OOOOOOO-W100.png) content addressed persistence for graph-like structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
+![](./img/OOOOOOO-W100.png) content addressed persistence for graph structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
 
 _WIP_
 
-## Demo
+## Technology demonstrator
 
-[O7 Hello](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
+[Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
 
-## Example
+## Minimal example
 
-Create
+Author data graphs. Providing a `proto-schema` is optional but very useful for navigation.  
 
 ```ts
 enum ObjectTypes {
@@ -32,7 +32,7 @@ enum KeyTypes {
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const blockCodec: BlockCodec = blockCodecFactory()
-const blockStore: BlockStore = memoryBlockStoreFactory()
+const blockStore: BlockStore = memoryBlockStoreFactory() // memory store
 const story: VersionStore = await versionStoreFactory({
     chunk,
     linkCodec,
@@ -76,7 +76,7 @@ const { root, index, blocks } = await tx.commit({
 })
 ```
 
-Optionally push created blocks elsewhere, eg. browser local, s3, etc.
+Generated blocks are stored in the provided `blockstore` but can also be pushed to other stores
 
 ```ts
 import { blockStore as idbStore } from '@dstanesc/idb-block-store'
@@ -84,7 +84,7 @@ const blockStore2 = idbStore({})
 await blockStore.push(blockStore2)
 ```
 
-Navigate the graph, filter data and extract results
+Navigate the graph, filter the data and extract vertex, edge or property information
 
 ```ts
 const query = async (versionRoot: Link): Promise<Prop[]> => {
@@ -114,7 +114,39 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
 }
 ```
 
-## Multiple stores
+... or extract coarser data fragments using templates. Proto-language / syntax still under evaluation. _WIP_
+
+```ts
+const DATA_TEMPLATE = {
+    fileName: {
+        $elemType: PathElemType.EXTRACT,
+        $type: KeyTypes.NAME,
+    },
+    includes: {
+        $elemType: PathElemType.EDGE,
+        $type: RlshpTypes.CONTAINS,
+        fileName: {
+            $elemType: PathElemType.EXTRACT,
+            $type: KeyTypes.NAME,
+        },
+    },
+}
+
+const request = new RequestBuilder()
+    .add(PathElemType.VERTEX)
+    .add(PathElemType.EDGE)
+    .add(PathElemType.VERTEX)
+    .template(DATA_TEMPLATE)
+    .maxResults(100)
+    .get()
+
+const vr: any[] = []
+for await (const result of navigateVertices(graph, [0], request)) {
+    vr.push(result)
+}
+```
+
+## Multiple block stores
 
 -   [IndexedDB](https://www.npmjs.com/package/@dstanesc/idb-block-store) for browser local
 -   [Azure](https://www.npmjs.com/package/@dstanesc/az-block-store)
@@ -133,6 +165,8 @@ interface BlockStore {
 ```
 
 ## Multiple APIs
+
+_WIP_
 
 -   Native
 -   Proto-gremlin

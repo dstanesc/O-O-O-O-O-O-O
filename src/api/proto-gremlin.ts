@@ -34,6 +34,7 @@ import {
     navigateVertices,
     navigateEdges,
     NavigationThreshold,
+    TemplatePathElem,
 } from '../navigate'
 import { VersionStore } from '../version-store'
 
@@ -104,6 +105,15 @@ abstract class NavigateWrapper {
         return this
     }
 
+    template(template: any): NavigateWrapper {
+        const pathElem: TemplatePathElem = {
+            elemType: PathElemType.TEMPLATE,
+            template,
+        }
+        this.navigation.path.push(pathElem)
+        return this
+    }
+
     maxResults(value: number): NavigateWrapper {
         this.navigation.request = new NavigationThreshold(value)
         return this
@@ -115,7 +125,7 @@ abstract class NavigateWrapper {
         yield* navigator.navigate(refs)
     }
 
-    abstract navigate(refs: Ref[]): AsyncGenerator<Part, void, void>
+    abstract navigate(refs: Ref[]): AsyncGenerator<any, void, void>
 }
 
 class NavigateVertexWrapper extends NavigateWrapper {
@@ -191,9 +201,9 @@ class NavigateVertexWrapper extends NavigateWrapper {
         return this.outE(...edgeTypes).inV()
     }
 
-    async *navigate(refs: VertexRef[]): AsyncGenerator<Part, void, void> {
+    async *navigate(refs: VertexRef[]): AsyncGenerator<any, void, void> {
         if (this.navigation.request === undefined)
-            this.navigation.request = new NavigationThreshold(100)
+            this.navigation.request = new NavigationThreshold(Number.MAX_SAFE_INTEGER)
         yield* navigateVertices(this.graph, refs, {
             path: this.navigation.path,
             request: this.navigation.request,
@@ -267,9 +277,9 @@ class NavigateEdgeWrapper extends NavigateWrapper {
         return new NavigateVertexWrapper(this.graph, this.navigation)
     }
 
-    async *navigate(refs: EdgeRef[]): AsyncGenerator<Part, void, void> {
+    async *navigate(refs: EdgeRef[]): AsyncGenerator<any, void, void> {
         if (this.navigation.request === undefined)
-            this.navigation.request = new NavigationThreshold(100)
+            this.navigation.request = new NavigationThreshold(Number.MAX_SAFE_INTEGER)
         yield* navigateEdges(this.graph, refs, {
             path: this.navigation.path,
             request: this.navigation.request,

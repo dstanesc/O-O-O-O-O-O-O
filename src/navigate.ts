@@ -22,6 +22,7 @@ enum PathElemType {
     VERTEX,
     EDGE,
     EXTRACT,
+    TEMPLATE,
 }
 
 interface PropPredicate {
@@ -53,6 +54,10 @@ interface VertexPathElem extends PathElem {
 interface ExtractPathElem extends PathElem {
     props: number[]
     reduce?: (previous: PropValue, current: PropValue) => ReducedValue
+}
+
+interface TemplatePathElem extends PathElem {
+    template: any
 }
 
 class RequestBuilder {
@@ -112,6 +117,15 @@ class RequestBuilder {
 
     extract(...props: number[]): RequestBuilder {
         let elem: ExtractPathElem = { elemType: PathElemType.EXTRACT, props }
+        this.path.push(elem)
+        return this
+    }
+
+    template(template: any): RequestBuilder {
+        let elem: TemplatePathElem = {
+            elemType: PathElemType.TEMPLATE,
+            template,
+        }
         this.path.push(elem)
         return this
     }
@@ -182,6 +196,11 @@ function isEdgePathElem(index: number, path: PathElem[]): boolean {
     return pathElem.elemType === PathElemType.EDGE
 }
 
+function isTemplatePathElem(index: number, path: PathElem[]): boolean {
+    const pathElem: PathElem = path[index]
+    return pathElem.elemType === PathElemType.TEMPLATE
+}
+
 async function lookaheadIndexedPredicate(
     graph: Graph,
     vertex: Vertex,
@@ -214,7 +233,7 @@ async function* yieldVertexOrGoDeeper(
     vertex: Vertex,
     graph: Graph,
     request: NavigationThreshold
-): AsyncGenerator<Part, void, void> {
+): AsyncGenerator<any, void, void> {
     let indexedPredicate = await lookaheadIndexedPredicate(
         graph,
         vertex,
@@ -234,9 +253,9 @@ async function* yieldVertexOrGoDeeper(
             index + 1,
             request
         )
-    // else if (isIndexPathElem(index + 1, path))
-    //     yield* navigateIndex(graph, vertex.nextIndex, path, index + 1, request)
-    else if (indexedPredicate !== undefined)
+    else if (isTemplatePathElem(index + 1, path)) {
+        yield* navigateTemplate(graph, vertex, path, index + 1, request)
+    } else if (indexedPredicate !== undefined)
         yield* navigateIndexedEdge(
             graph,
             indexedPredicate,
@@ -253,7 +272,7 @@ async function* yieldEdgeOrGoDeeper(
     edge: Edge,
     graph: Graph,
     request: NavigationThreshold
-): AsyncGenerator<Part, void, void> {
+): AsyncGenerator<any, void, void> {
     if (checkFinished(index, path)) {
         request.increment()
         yield edge
@@ -274,7 +293,7 @@ async function* navigateVertices(
     graph: Graph,
     refs: VertexRef[],
     { path, request }: { path: PathElem[]; request: NavigationThreshold }
-): AsyncGenerator<Part, void, void> {
+): AsyncGenerator<any, void, void> {
     const index = 0
     try {
         for (const ref of refs) {
@@ -291,12 +310,44 @@ async function* navigateEdges(
     graph: Graph,
     refs: EdgeRef[],
     { path, request }: { path: PathElem[]; request: NavigationThreshold }
-): AsyncGenerator<Part, void, void> {
+): AsyncGenerator<any, void, void> {
     const index = 0
     try {
         for (const ref of refs) {
             yield* navigateEdge(graph, ref, path, index, request)
         }
+    } catch (e) {
+        if (e instanceof SearchCompleted) {
+            return
+        } else throw e
+    }
+}
+async function* navigatePropCatchCompleted(
+    graph: Graph,
+    part: Part,
+    ref: PropRef,
+    path: PathElem[],
+    index: number,
+    request: NavigationThreshold
+): AsyncGenerator<any, void, void> {
+    try {
+        yield* navigateProp(graph, part, ref, path, index, request)
+    } catch (e) {
+        if (e instanceof SearchCompleted) {
+            return
+        } else throw e
+    }
+}
+
+async function* navigateEdgeCatchCompleted(
+    graph: Graph,
+    ref: EdgeRef,
+    path: PathElem[],
+    index: number,
+    request: NavigationThreshold
+): AsyncGenerator<any, void, void> {
+    try {
+        yield* navigateEdge(graph, ref, path, index, request)
     } catch (e) {
         if (e instanceof SearchCompleted) {
             return
@@ -310,7 +361,7 @@ async function* navigateVertex(
     path: PathElem[],
     index: number,
     request: NavigationThreshold
-): AsyncGenerator<Part, void, void> {
+): AsyncGenerator<any, void, void> {
     const pathElem: VertexPathElem = path[index] as VertexPathElem
     if (ref !== undefined) {
         const vertex: Vertex = await graph.getVertex(ref)
@@ -388,22 +439,6 @@ async function* navigateEdge(
     }
 }
 
-// async function* navigateIndex(graph: Graph, ref: IndexRef, path: PathElem[], index: number, request: NavigationThreshold): AsyncGenerator<Part, void, void> {
-//     const pathElem: IndexPathElem = path[index] as IndexPathElem
-//     if (ref !== undefined) {
-//         let indexStruct: Index = await graph.getIndex(ref)
-//         if (pathElem.types.includes(indexStruct.type)) {
-//             if (pathElem.propPredicate === undefined) {
-//                 throw new Error(`Prop predicate needs specified for index navigation`)
-//             } else {
-//                 const { value, ref: edgeRef }: IndexedValue = await graph.searchIndex(indexStruct, pathElem.propPredicate)
-//                 let edge: Edge = await graph.getEdge(edgeRef)
-//                 yield* yieldEdgeOrGoDeeper(index, path, edge, graph, request)
-//             }
-//         } else throw new Error(`Unknown index type ${pathElem.types}`)
-//     }
-// }
-
 async function* navigateIndexedEdge(
     graph: Graph,
     indexedPredicate: { propPredicate: PropPredicate; indexStruct: Index },
@@ -476,11 +511,89 @@ async function navigatePropsAndReduce(
     return { context, value: reducedValue }
 }
 
+async function* navigateTemplate(
+    graph: Graph,
+    vertex: Vertex,
+    path: PathElem[],
+    index: number,
+    request: NavigationThreshold
+): AsyncGenerator<any, void, void> {
+    const pathElem: TemplatePathElem = path[index] as TemplatePathElem
+    const template: any = pathElem.template
+    const result = {}
+    for (const [key, value] of Object.entries(template)) {
+        const elemType = value['$elemType']
+        const schemaType = value['$type']
+        if (elemType === PathElemType.EXTRACT) {
+            let propElem: ExtractPathElem = {
+                elemType: PathElemType.EXTRACT,
+                props: [schemaType],
+            }
+            const propPath = [...path.slice(0, index), propElem]
+            for await (const prop of navigatePropCatchCompleted(
+                graph,
+                vertex,
+                vertex.nextProp,
+                propPath,
+                index,
+                new NavigationThreshold(Number.MAX_SAFE_INTEGER)
+            )) {
+                result[key] = prop.value
+            }
+        } else if (elemType === PathElemType.EDGE) {
+            let edgeElem: EdgePathElem = {
+                elemType: PathElemType.EDGE,
+                types: [schemaType],
+            }
+            const edgePath = [...path.slice(0, index), edgeElem]
+            const nestedResults = []
+            for await (const edge of navigateEdgeCatchCompleted(
+                graph,
+                vertex.nextEdge,
+                edgePath,
+                index,
+                new NavigationThreshold(Number.MAX_SAFE_INTEGER)
+            )) {
+                const realEdge = edge as Edge
+                const vertex: Vertex = await graph.getVertex(realEdge.target)
+                const vertexElem: VertexPathElem = {
+                    elemType: PathElemType.VERTEX,
+                }
+                const templateElem: TemplatePathElem = {
+                    elemType: PathElemType.TEMPLATE,
+                    template: value,
+                }
+                const valueOnly = value['$value'] !== undefined
+                const templateFragmentPath = [vertexElem, templateElem]
+                for await (const nestedResult of navigateTemplate(
+                    graph,
+                    vertex,
+                    templateFragmentPath,
+                    1,
+                    new NavigationThreshold(Number.MAX_SAFE_INTEGER)
+                )) {
+                    const realNestedResult = valueOnly
+                        ? nestedResult.$value
+                        : nestedResult
+                    nestedResults.push(realNestedResult)
+                }
+            }
+            if (nestedResults.length > 0) {
+                result[key] = nestedResults
+            }
+        }
+    }
+    request.increment()
+    yield result
+    request.completeWhenDone()
+}
+
 export {
     PathElem,
     EdgePathElem,
     VertexPathElem,
     ExtractPathElem,
+    TemplatePathElem,
     PropPredicate,
     PathElemType,
     RequestBuilder,

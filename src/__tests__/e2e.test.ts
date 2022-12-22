@@ -20,6 +20,8 @@ import {
 import { indexStoreFactory } from '../index-store-factory'
 import { eq } from '../ops'
 import { VersionStore, versionStoreFactory } from '../version-store'
+import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
+import { Graph } from '../graph'
 
 const getStream = bent('https://raw.githubusercontent.com')
 
@@ -481,6 +483,236 @@ describe('e2e ', function () {
                 .toString()}`
         )
     })
+
+    test('full bible, 7MB json, no index, template based retrieval', async () => {
+        const stream = await getStream(
+            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+        )
+        const str = (await stream.text()).trim()
+        const lines = str.split(/\r?\n/g)
+
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockCodec: BlockCodec = blockCodecFactory()
+        const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
+
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+            versionStore,
+        }).g()
+
+        const tx = await g.tx()
+
+        const bible = await tx.addV(ObjectTypes.ROOT).next()
+
+        let book: any, book_id: string
+        let chapter: any, chapter_id: number
+        let verse: any, verse_id: number
+
+        for (const line of lines) {
+            const entry = JSON.parse(line)
+            if (book === undefined || book_id !== entry.book_id) {
+                book = await tx
+                    .addV(ObjectTypes.BOOK)
+                    .property(KeyTypes.ID, entry.book_id, PropTypes.ANY)
+                    .property(KeyTypes.NAME, entry.book_name, PropTypes.ANY)
+                    .next()
+                book_id = entry.book_id
+                await tx.addE(RlshpTypes.book).from(bible).to(book).next()
+            }
+            if (chapter === undefined || chapter_id !== entry.chapter) {
+                chapter = await tx
+                    .addV(ObjectTypes.CHAPTER)
+                    .property(KeyTypes.ID, entry.chapter, PropTypes.ANY)
+                    .next()
+                chapter_id = entry.chapter
+                await tx.addE(RlshpTypes.chapter).from(book).to(chapter).next()
+            }
+            if (verse === undefined || verse_id !== entry.verse) {
+                verse = await tx
+                    .addV(ObjectTypes.VERSE)
+                    .property(KeyTypes.ID, entry.verse, PropTypes.ANY)
+                    .property(KeyTypes.TEXT, entry.text, PropTypes.ANY)
+                    .next()
+                verse_id = entry.verse
+                await tx.addE(RlshpTypes.verse).from(chapter).to(verse).next()
+            }
+        }
+
+        const { root, index, blocks } = await tx.commit({})
+
+        const books = await queryBooksTemplateGremlin(
+            g,
+            bible.offset,
+            BOOKS_TEMPLATE_1
+        )
+
+        assert.strictEqual(books.length, 66)
+        assert.strictEqual(books[0].id, 'Gen')
+        assert.strictEqual(books[0].name, 'Genesis')
+        assert.deepStrictEqual(books[0].chapters, [
+            { id: 1 },
+            { id: 2 },
+            { id: 3 },
+            { id: 4 },
+            { id: 5 },
+            { id: 6 },
+            { id: 7 },
+            { id: 8 },
+            { id: 9 },
+            { id: 10 },
+            { id: 11 },
+            { id: 12 },
+            { id: 13 },
+            { id: 14 },
+            { id: 15 },
+            { id: 16 },
+            { id: 17 },
+            { id: 18 },
+            { id: 19 },
+            { id: 20 },
+            { id: 21 },
+            { id: 22 },
+            { id: 23 },
+            { id: 24 },
+            { id: 25 },
+            { id: 26 },
+            { id: 27 },
+            { id: 28 },
+            { id: 29 },
+            { id: 30 },
+            { id: 31 },
+            { id: 32 },
+            { id: 33 },
+            { id: 34 },
+            { id: 35 },
+            { id: 36 },
+            { id: 37 },
+            { id: 38 },
+            { id: 39 },
+            { id: 40 },
+            { id: 41 },
+            { id: 42 },
+            { id: 43 },
+            { id: 44 },
+            { id: 45 },
+            { id: 46 },
+            { id: 47 },
+            { id: 48 },
+            { id: 49 },
+            { id: 50 },
+        ])
+
+        assert.strictEqual(books[1].id, 'Exod')
+        assert.strictEqual(books[1].name, 'Exodus')
+        assert.deepStrictEqual(books[1].chapters, [
+            { id: 1 },
+            { id: 2 },
+            { id: 3 },
+            { id: 4 },
+            { id: 5 },
+            { id: 6 },
+            { id: 7 },
+            { id: 8 },
+            { id: 9 },
+            { id: 10 },
+            { id: 11 },
+            { id: 12 },
+            { id: 13 },
+            { id: 14 },
+            { id: 15 },
+            { id: 16 },
+            { id: 17 },
+            { id: 18 },
+            { id: 19 },
+            { id: 20 },
+            { id: 21 },
+            { id: 22 },
+            { id: 23 },
+            { id: 24 },
+            { id: 25 },
+            { id: 26 },
+            { id: 27 },
+            { id: 28 },
+            { id: 29 },
+            { id: 30 },
+            { id: 31 },
+            { id: 32 },
+            { id: 33 },
+            { id: 34 },
+            { id: 35 },
+            { id: 36 },
+            { id: 37 },
+            { id: 38 },
+            { id: 39 },
+            { id: 40 },
+        ])
+
+        const books2 = await queryBooksTemplateGremlin(
+            g,
+            bible.offset,
+            BOOKS_TEMPLATE_2
+        )
+
+        assert.strictEqual(books2.length, 66)
+
+        assert.strictEqual(books2[0].id, 'Gen')
+        assert.strictEqual(books2[0].name, 'Genesis')
+        assert.deepStrictEqual(
+            books2[0].chapters,
+            [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+                19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+                35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+            ]
+        )
+
+        assert.deepStrictEqual(books2[65], {
+            id: 'Rev',
+            name: 'Revelation',
+            chapters: [
+                2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                20, 21, 22,
+            ],
+        })
+
+        const books3 = await queryBooksTemplateNative(
+            g.graph,
+            bible.offset,
+            BOOKS_TEMPLATE_2
+        )
+
+        assert.strictEqual(books3.length, 66)
+
+        assert.deepStrictEqual(books3[0], {
+            id: 'Gen',
+            name: 'Genesis',
+            chapters: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+                19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+                35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+            ],
+        })
+
+        assert.deepStrictEqual(books3[65], {
+            id: 'Rev',
+            name: 'Revelation',
+            chapters: [
+                2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                20, 21, 22,
+            ],
+        })
+    })
 })
 
 async function queryVerse(
@@ -525,4 +757,85 @@ async function queryBooks(g: ProtoGremlin, rootOffset: VertexRef) {
         books.push((result as Prop).value)
     }
     return books
+}
+
+const BOOKS_TEMPLATE_1 = {
+    id: {
+        $elemType: PathElemType.EXTRACT,
+        $type: KeyTypes.ID,
+    },
+    name: {
+        $elemType: PathElemType.EXTRACT,
+        $type: KeyTypes.NAME,
+    },
+    chapters: {
+        $elemType: PathElemType.EDGE,
+        $type: RlshpTypes.chapter,
+        id: {
+            $elemType: PathElemType.EXTRACT,
+            $type: KeyTypes.ID,
+        },
+    },
+}
+
+const BOOKS_TEMPLATE_2 = {
+    id: {
+        $elemType: PathElemType.EXTRACT,
+        $type: KeyTypes.ID,
+    },
+    name: {
+        $elemType: PathElemType.EXTRACT,
+        $type: KeyTypes.NAME,
+    },
+    chapters: {
+        $elemType: PathElemType.EDGE,
+        $type: RlshpTypes.chapter,
+        $value: {
+            $elemType: PathElemType.EXTRACT,
+            $type: KeyTypes.ID,
+        },
+    },
+}
+
+async function queryBooksTemplateGremlin(
+    g: ProtoGremlin,
+    rootOffset: VertexRef,
+    template: any
+): Promise<any[]> {
+    const vr = []
+    const startTime = new Date().getTime()
+
+    for await (const result of g
+        .V([rootOffset])
+        .out(RlshpTypes.book)
+        .hasType(ObjectTypes.BOOK)
+        .template(template)
+        .maxResults(100)
+        .exec()) {
+        vr.push(result)
+    }
+    const endTime = new Date().getTime()
+    console.log(`Query Time ${endTime - startTime} ms`)
+
+    return vr
+}
+
+const queryBooksTemplateNative = async (
+    graph: Graph,
+    rootOffset: VertexRef,
+    template: any
+): Promise<any[]> => {
+    const request = new RequestBuilder()
+        .add(PathElemType.VERTEX)
+        .add(PathElemType.EDGE)
+        .add(PathElemType.VERTEX)
+        .template(template)
+        .maxResults(100)
+        .get()
+
+    const vr: any[] = []
+    for await (const result of navigateVertices(graph, [rootOffset], request)) {
+        vr.push(result)
+    }
+    return vr
 }
