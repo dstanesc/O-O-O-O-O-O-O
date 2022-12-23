@@ -48,7 +48,7 @@ const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 describe('Extract graph data fragments', function () {
-    test('internal & proto-gremlin api, simple data template', async () => {
+    test('internal & proto-gremlin api, simple navigation incl. data template', async () => {
         /**
          * Build original data set
          */
