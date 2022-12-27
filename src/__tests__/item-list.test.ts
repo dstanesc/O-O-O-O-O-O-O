@@ -218,7 +218,7 @@ describe('Minimal item list', function () {
         })
 
         /**
-         * Get range fro 25 to 50
+         * Item range from 25 to 75
          */
         const range: Item[] = await itemList.range(25, 50) // start index, count
         console.log(range)
