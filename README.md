@@ -148,7 +148,7 @@ for await (const result of navigateVertices(graph, [0], request)) {
 
 _WIP_
 
-A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. O-O-O-O-O-O-O) graph. Item values as vertex properties. Vertices are connected with a single, implicit `parent` edge.
+A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
 
 ```ts
 enum KeyTypes {
