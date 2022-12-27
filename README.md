@@ -1,16 +1,14 @@
 # O-O-O-O-O-O-O
 
-![](./img/OOOOOOO-W100.png) content addressed persistence for graph structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
+![](./img/OOOOOOO-W100.png) content addressed persistence for data structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
 
-_WIP_
-
-## Technology demonstrator
+## Demo
 
 [Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
 
-## Minimal example
+## Graph Example
 
-Author data graphs. Providing a `proto-schema` is optional but very useful for navigation.  
+Author data graphs. Providing a `proto-schema` is optional.
 
 ```ts
 enum ObjectTypes {
@@ -144,6 +142,53 @@ const vr: any[] = []
 for await (const result of navigateVertices(graph, [0], request)) {
     vr.push(result)
 }
+```
+
+## List Example
+
+_WIP_
+
+A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. O-O-O-O-O-O-O) graph. Item values as vertex properties. Vertices are connected with a single, implicit `parent` edge.
+
+```ts
+enum KeyTypes {
+    NAME = 1,
+}
+const { chunk } = chunkerFactory(512, compute_chunks)
+const linkCodec: LinkCodec = linkCodecFactory()
+const blockCodec: BlockCodec = blockCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
+const blockStore: BlockStore = memoryBlockStoreFactory()
+const versionStore: VersionStore = await versionStoreFactory({
+    chunk,
+    linkCodec,
+    blockCodec,
+    blockStore,
+})
+const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const itemList: ItemList = itemListFactory(versionStore, store)
+const tx = itemList.tx()
+await tx.start()
+await tx.push(new Map([[KeyTypes.NAME, 'item 0']]))
+await tx.push(new Map([[KeyTypes.NAME, 'item 1']]))
+await tx.push(new Map([[KeyTypes.NAME, 'item 2']]))
+const { root, index, blocks } = await tx.commit({
+    comment: 'First commit',
+    tags: ['v0.0.1'],
+})
+```
+
+The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
+
+```ts
+const len = await itemList.length()
+assert.strictEqual(3, len)
+const item0 = await itemList.get(0)
+assert.strictEqual('item 0', item0.get(KeyTypes.NAME))
+const item1 = await itemList.get(1)
+assert.strictEqual('item 1', item1.get(KeyTypes.NAME))
+const item2 = await itemList.get(2)
+assert.strictEqual('item 2', item2.get(KeyTypes.NAME))
 ```
 
 ## Multiple block stores

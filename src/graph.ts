@@ -392,6 +392,31 @@ class Graph implements ElementAccessor {
         return indexedValue
     }
 
+    async getVertexProps(vertex: Vertex): Promise<Prop[]> {
+        const props: Prop[] = []
+        if (vertex.nextProp !== undefined) {
+            await this.getNextProps(vertex.nextProp, props)
+        }
+        return props
+    }
+
+    async getEdgeProps(edge: Edge): Promise<Prop[]> {
+        const props: Prop[] = []
+        if (edge.nextProp !== undefined) {
+            await this.getNextProps(edge.nextProp, props)
+        }
+        return props
+    }
+
+    async getNextProps(ref: PropRef, props: Prop[]): Promise<void> {
+        const prop: Prop = await this.getProp(ref)
+        props.push(prop)
+        if (prop.nextProp !== undefined) {
+            await this.getNextProps(prop.nextProp, props)
+        }
+    }
+
+
     tx() {
         return new Tx(this)
     }
