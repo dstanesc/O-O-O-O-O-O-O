@@ -32,6 +32,92 @@ import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
 import { BlockStore } from './block-store'
 
+interface GraphStore {
+    vertexGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Vertex>
+    vertexRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        vertexCount: number
+    ) => Promise<Vertex[]>
+    edgeGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Edge>
+    edgeRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        edgeCount: number
+    ) => Promise<Edge[]>
+    propGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Prop>
+    propRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        propCount: number
+    ) => Promise<Prop[]>
+    indexGet: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number
+    ) => Promise<Index>
+    offsetsGet: ({ root, index }: { root: Link; index: RootIndex }) => Promise<{
+        vertexOffset: Offset
+        edgeOffset: Offset
+        propOffset: Offset
+        indexOffset: Offset
+    }>
+    verticesAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Vertex[]>
+    edgesAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Edge[]>
+    propsAll: ({
+        root,
+        index,
+    }: {
+        root: Link
+        index: RootIndex
+    }) => Promise<Prop[]>
+    commit: (
+        { root, index }: { root: Link; index: RootIndex },
+        {
+            vertices,
+            edges,
+            props,
+        }: {
+            vertices: {
+                added: Map<number, Vertex>
+                updated: Map<number, Vertex>
+            }
+            edges: {
+                added: Map<number, Edge>
+                updated: Map<number, Edge>
+            }
+            props: {
+                added: Map<number, Prop>
+                updated: Map<number, Prop>
+            }
+            indices: {
+                added: Map<number, Index>
+                updated: Map<number, Index>
+            }
+        }
+    ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+}
+
 const { create, read, append, update, bulk, remove, readIndex } = chunkyStore()
 
 const graphStore = ({
@@ -44,12 +130,11 @@ const graphStore = ({
     linkCodec: LinkCodec
     valueCodec: ValueCodec
     blockStore: BlockStore
-}) => {
+}): GraphStore => {
     const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodec
     const { encode: valueEncode, decode: valueDecode }: ValueCodec = valueCodec
     const { put: blockPut, get: blockGet } = blockStore
 
-    // FIXME - read larger chunks of data
     const vertexGet = async (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
@@ -62,6 +147,25 @@ const graphStore = ({
             get: blockGet,
         })
         return new VertexDecoder(bytes).readVertex()
+    }
+
+    const vertexRange = async (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        vertexCount: number
+    ): Promise<Vertex[]> => {
+        const { vertexRoot, vertexIndex } = index
+        const bytes = await read(
+            offset,
+            vertexCount * OFFSET_INCREMENTS.VERTEX_INCREMENT,
+            {
+                root: vertexRoot,
+                index: vertexIndex,
+                decode: linkDecode,
+                get: blockGet,
+            }
+        )
+        return new VertexDecoder(bytes).read()
     }
 
     const edgeGet = async (
@@ -78,6 +182,25 @@ const graphStore = ({
         return new EdgeDecoder(bytes).readEdge()
     }
 
+    const edgeRange = async (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        edgeCount: number
+    ): Promise<Edge[]> => {
+        const { edgeRoot, edgeIndex } = index
+        const bytes = await read(
+            offset,
+            edgeCount * OFFSET_INCREMENTS.EDGE_INCREMENT,
+            {
+                root: edgeRoot,
+                index: edgeIndex,
+                decode: linkDecode,
+                get: blockGet,
+            }
+        )
+        return new EdgeDecoder(bytes).read()
+    }
+
     const propGet = async (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
@@ -89,10 +212,30 @@ const graphStore = ({
             decode: linkDecode,
             get: blockGet,
         })
-
         return new PropDecoder(bytes, (ref: ValueRef) =>
             valueGet({ root, index }, ref)
         ).readProp()
+    }
+
+    const propRange = async (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        propCount: number
+    ): Promise<Prop[]> => {
+        const { propRoot, propIndex } = index
+        const bytes = await read(
+            offset,
+            propCount * OFFSET_INCREMENTS.PROP_INCREMENT,
+            {
+                root: propRoot,
+                index: propIndex,
+                decode: linkDecode,
+                get: blockGet,
+            }
+        )
+        return new PropDecoder(bytes, (ref: ValueRef) =>
+            valueGet({ root, index }, ref)
+        ).read()
     }
 
     const valueGet = async (
@@ -556,8 +699,11 @@ const graphStore = ({
     return {
         commit,
         vertexGet,
+        vertexRange,
         edgeGet,
+        edgeRange,
         propGet,
+        propRange,
         indexGet,
         offsetsGet,
         verticesAll,
@@ -566,4 +712,4 @@ const graphStore = ({
     }
 }
 
-export { graphStore }
+export { graphStore, GraphStore }

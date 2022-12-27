@@ -1,14 +1,72 @@
 # O-O-O-O-O-O-O
 
-![](./img/OOOOOOO-W100.png) content addressed persistence for data structures. Neo4j inspired index-free adjacency for navigation efficiency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks, are effectively immutable and identified w/ cryptographic hashes. Depending on graph topology, edge indexing can minimize the number of block reads, hence accelerate navigation. Indexing is using the [prolly trees](https://www.npmjs.com/package/prolly-trees) library.
+![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Neo4j inspired index-free adjacency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
+
 
 ## Demo
 
-[Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
+Graph navigation using IPFS [Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
 
-## Graph Example
+## List
 
-Author data graphs. Providing a `proto-schema` is optional.
+_WIP_
+
+A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
+
+```ts
+enum KeyTypes {
+    ID = 11,
+    NAME = 33,
+}
+const { chunk } = chunkerFactory(512, compute_chunks)
+const linkCodec: LinkCodec = linkCodecFactory()
+const blockCodec: BlockCodec = blockCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
+const blockStore: BlockStore = memoryBlockStoreFactory()
+const versionStore: VersionStore = await versionStoreFactory({
+    chunk,
+    linkCodec,
+    blockCodec,
+    blockStore,
+})
+const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const itemList: ItemList = itemListFactory(versionStore, store)
+const tx = itemList.tx()
+await tx.start()
+for (let i = 0; i < 100; i++) {
+    const itemValue: ItemValue = new Map<number, any>()
+    itemValue.set(KeyTypes.ID, i)
+    itemValue.set(KeyTypes.NAME, `item ${i}`)
+    await tx.push(itemValue)
+}
+const { root, index, blocks } = await tx.commit({
+    comment: 'First commit',
+    tags: ['v0.0.1'],
+})
+```
+
+The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
+
+```ts
+const len = await itemList.length()
+assert.strictEqual(100, len)
+const item0 = await itemList.get(0)
+assert.strictEqual('item 0', item0.value.get(KeyTypes.NAME))
+```
+
+Range access intended to minimize I/O by sequential reads at byte array level.
+
+```ts
+const range: Item[] = await itemList.range(25, 50) // start index, count
+assert.strictEqual(50, range.length)
+for (let i = 0; i < range.length; i++) {
+    assert.strictEqual(`item ${i + 25}`, range[i].value.get(KeyTypes.NAME))
+}
+```
+
+## Graph
+
+Authoring data graphs. Providing a `proto-schema` is optional. Below a graph structure mapping a pseudo file system:
 
 ```ts
 enum ObjectTypes {
@@ -74,14 +132,6 @@ const { root, index, blocks } = await tx.commit({
 })
 ```
 
-Generated blocks are stored in the provided `blockstore` but can also be pushed to other stores
-
-```ts
-import { blockStore as idbStore } from '@dstanesc/idb-block-store'
-const blockStore2 = idbStore({})
-await blockStore.push(blockStore2)
-```
-
 Navigate the graph, filter the data and extract vertex, edge or property information
 
 ```ts
@@ -111,8 +161,9 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
     return vr
 }
 ```
+_WIP_
 
-... or extract coarser data fragments using templates. Proto-language / syntax still under evaluation. _WIP_
+... or extract coarser data fragments using data templates. Proto-language / syntax still under evaluation, hinting towards GraphQL.
 
 ```ts
 const DATA_TEMPLATE = {
@@ -144,52 +195,6 @@ for await (const result of navigateVertices(graph, [0], request)) {
 }
 ```
 
-## List Example
-
-_WIP_
-
-A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
-
-```ts
-enum KeyTypes {
-    NAME = 1,
-}
-const { chunk } = chunkerFactory(512, compute_chunks)
-const linkCodec: LinkCodec = linkCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
-const valueCodec: ValueCodec = valueCodecFactory()
-const blockStore: BlockStore = memoryBlockStoreFactory()
-const versionStore: VersionStore = await versionStoreFactory({
-    chunk,
-    linkCodec,
-    blockCodec,
-    blockStore,
-})
-const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-const itemList: ItemList = itemListFactory(versionStore, store)
-const tx = itemList.tx()
-await tx.start()
-await tx.push(new Map([[KeyTypes.NAME, 'item 0']]))
-await tx.push(new Map([[KeyTypes.NAME, 'item 1']]))
-await tx.push(new Map([[KeyTypes.NAME, 'item 2']]))
-const { root, index, blocks } = await tx.commit({
-    comment: 'First commit',
-    tags: ['v0.0.1'],
-})
-```
-
-The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
-
-```ts
-const len = await itemList.length()
-assert.strictEqual(3, len)
-const item0 = await itemList.get(0)
-assert.strictEqual('item 0', item0.get(KeyTypes.NAME))
-const item1 = await itemList.get(1)
-assert.strictEqual('item 1', item1.get(KeyTypes.NAME))
-const item2 = await itemList.get(2)
-assert.strictEqual('item 2', item2.get(KeyTypes.NAME))
-```
 
 ## Multiple block stores
 

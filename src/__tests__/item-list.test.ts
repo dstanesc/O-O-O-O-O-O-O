@@ -13,11 +13,14 @@ import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
 import * as assert from 'assert'
 import { VersionStore, versionStoreFactory } from '../version-store'
-import { ItemList, itemListFactory, ItemListTransaction } from '../item-list'
+import {
+    Item,
+    ItemList,
+    itemListFactory,
+    ItemListTransaction,
+    ItemValue,
+} from '../item-list'
 
-enum KeyTypes {
-    NAME = 1,
-}
 describe('Minimal item list', function () {
     test('internal api, creation and retrieval by index', async () => {
         const { chunk } = chunkerFactory(512, compute_chunks)
@@ -36,6 +39,9 @@ describe('Minimal item list', function () {
         /**
          * Create an item list
          */
+        enum KeyTypes {
+            NAME = 1,
+        }
         const itemList: ItemList = itemListFactory(versionStore, store)
         const tx = itemList.tx()
         await tx.start()
@@ -53,13 +59,13 @@ describe('Minimal item list', function () {
         assert.strictEqual(3, len)
 
         const item0 = await itemList.get(0)
-        assert.strictEqual('item 0', item0.get(KeyTypes.NAME))
+        assert.strictEqual('item 0', item0.value.get(KeyTypes.NAME))
 
         const item1 = await itemList.get(1)
-        assert.strictEqual('item 1', item1.get(KeyTypes.NAME))
+        assert.strictEqual('item 1', item1.value.get(KeyTypes.NAME))
 
         const item2 = await itemList.get(2)
-        assert.strictEqual('item 2', item2.get(KeyTypes.NAME))
+        assert.strictEqual('item 2', item2.value.get(KeyTypes.NAME))
 
         assert.equal(
             'bafkreie2iaqxhv56xdtqyih57txqllfwswu7ixhgbnkmfts5weybfuodgu',
@@ -89,13 +95,13 @@ describe('Minimal item list', function () {
         assert.strictEqual(6, len2)
 
         const item3 = await itemList.get(3)
-        assert.strictEqual('item 3', item3.get(KeyTypes.NAME))
+        assert.strictEqual('item 3', item3.value.get(KeyTypes.NAME))
 
         const item4 = await itemList.get(4)
-        assert.strictEqual('item 4', item4.get(KeyTypes.NAME))
+        assert.strictEqual('item 4', item4.value.get(KeyTypes.NAME))
 
         const item5 = await itemList.get(5)
-        assert.strictEqual('item 5', item5.get(KeyTypes.NAME))
+        assert.strictEqual('item 5', item5.value.get(KeyTypes.NAME))
 
         assert.equal(
             'bafkreie53yzg5oscjwtktgf46o33zipoyomm3ra42lclsv3eapksssflta',
@@ -111,13 +117,13 @@ describe('Minimal item list', function () {
         assert.strictEqual(6, len3)
 
         const item6 = await itemList2.get(3)
-        assert.strictEqual('item 3', item6.get(KeyTypes.NAME))
+        assert.strictEqual('item 3', item6.value.get(KeyTypes.NAME))
 
         const item7 = await itemList2.get(4)
-        assert.strictEqual('item 4', item7.get(KeyTypes.NAME))
+        assert.strictEqual('item 4', item7.value.get(KeyTypes.NAME))
 
         const item8 = await itemList2.get(5)
-        assert.strictEqual('item 5', item8.get(KeyTypes.NAME))
+        assert.strictEqual('item 5', item8.value.get(KeyTypes.NAME))
 
         /**
          * Rehydrate the item list from root, fresh version store
@@ -139,22 +145,22 @@ describe('Minimal item list', function () {
         assert.strictEqual(6, len4)
 
         const item9 = await itemList3.get(0)
-        assert.strictEqual('item 0', item9.get(KeyTypes.NAME))
+        assert.strictEqual('item 0', item9.value.get(KeyTypes.NAME))
 
         const item10 = await itemList3.get(1)
-        assert.strictEqual('item 1', item10.get(KeyTypes.NAME))
+        assert.strictEqual('item 1', item10.value.get(KeyTypes.NAME))
 
         const item11 = await itemList3.get(2)
-        assert.strictEqual('item 2', item11.get(KeyTypes.NAME))
+        assert.strictEqual('item 2', item11.value.get(KeyTypes.NAME))
 
         const item12 = await itemList3.get(3)
-        assert.strictEqual('item 3', item12.get(KeyTypes.NAME))
+        assert.strictEqual('item 3', item12.value.get(KeyTypes.NAME))
 
         const item13 = await itemList3.get(4)
-        assert.strictEqual('item 4', item13.get(KeyTypes.NAME))
+        assert.strictEqual('item 4', item13.value.get(KeyTypes.NAME))
 
         const item14 = await itemList3.get(5)
-        assert.strictEqual('item 5', item14.get(KeyTypes.NAME))
+        assert.strictEqual('item 5', item14.value.get(KeyTypes.NAME))
 
         /**
          * Navigate back in time to the first commit
@@ -166,13 +172,62 @@ describe('Minimal item list', function () {
         assert.strictEqual(3, len5)
 
         const item15 = await itemList5.get(0)
-        assert.strictEqual('item 0', item15.get(KeyTypes.NAME))
+        assert.strictEqual('item 0', item15.value.get(KeyTypes.NAME))
 
         const item16 = await itemList5.get(1)
-        assert.strictEqual('item 1', item16.get(KeyTypes.NAME))
+        assert.strictEqual('item 1', item16.value.get(KeyTypes.NAME))
 
         const item17 = await itemList5.get(2)
-        assert.strictEqual('item 2', item17.get(KeyTypes.NAME))
+        assert.strictEqual('item 2', item17.value.get(KeyTypes.NAME))
+    })
 
+    test('internal api, creation and range retrieval, rangex', async () => {
+        const { chunk } = chunkerFactory(512, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const blockCodec: BlockCodec = blockCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockStore: BlockStore = memoryBlockStoreFactory()
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            blockCodec,
+            blockStore,
+        })
+        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+
+        /**
+         * Create an item list
+         */
+        enum KeyTypes {
+            ID = 11,
+            NAME = 33,
+        }
+        const itemList: ItemList = itemListFactory(versionStore, store)
+        const tx = itemList.tx()
+        await tx.start()
+        for (let i = 0; i < 100; i++) {
+            const itemValue: ItemValue = new Map<number, any>()
+            itemValue.set(KeyTypes.ID, i)
+            itemValue.set(KeyTypes.NAME, `item ${i}`)
+            await tx.push(itemValue)
+        }
+
+        const { root, index, blocks } = await tx.commit({
+            comment: 'First commit',
+            tags: ['v0.0.1'],
+        })
+
+        /**
+         * Get range fro 25 to 50
+         */
+        const range: Item[] = await itemList.range(25, 50) // start index, count
+        console.log(range)
+        assert.strictEqual(50, range.length)
+        for (let i = 0; i < range.length; i++) {
+            assert.strictEqual(
+                `item ${i + 25}`,
+                range[i].value.get(KeyTypes.NAME)
+            )
+        }
     })
 })

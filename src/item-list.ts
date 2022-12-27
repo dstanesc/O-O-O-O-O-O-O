@@ -1,4 +1,5 @@
 import { Graph, Tx } from './graph'
+import { GraphStore } from './graph-store'
 import { OFFSET_INCREMENTS } from './serde'
 import {
     Version,
@@ -13,12 +14,13 @@ import {
     Tag,
     Comment,
 } from './types'
+import { VersionStore } from './version-store'
 
 interface ItemList {
     tx: () => ItemListTransaction
-    get: (index: number) => Promise<ItemValue>
+    get: (index: number) => Promise<Item>
+    range: (startIndex: number, itemCount: number) => Promise<Item[]>
     length: () => Promise<number>
-    all: () => Promise<ItemValue[]>
 }
 
 type ItemValue = Map<number, any>
@@ -28,159 +30,54 @@ interface ItemRef {
     offset: number
 }
 
-const itemListFactory = (
-    {
-        versionSet,
-        rootGet,
-    }: {
-        versionSet: ({
-            version,
-            index,
-        }: {
-            version: Version
-            index: RootIndex
-        }) => Promise<Link>
-        rootGet: () => Promise<{ root: Link; index: RootIndex }>
-    },
-    {
-        vertexGet,
-        edgeGet,
-        propGet,
-        indexGet,
-        offsetsGet,
-        verticesAll,
-        edgesAll,
-        propsAll,
-        commit,
-    }: {
-        vertexGet: (
-            { root, index }: { root: Link; index: RootIndex },
-            offset: number
-        ) => Promise<Vertex>
-        edgeGet: (
-            { root, index }: { root: Link; index: RootIndex },
-            offset: number
-        ) => Promise<Edge>
-        propGet: (
-            { root, index }: { root: Link; index: RootIndex },
-            offset: number
-        ) => Promise<Prop>
-        indexGet: (
-            { root, index }: { root: Link; index: RootIndex },
-            offset: number
-        ) => Promise<Index>
-        offsetsGet: ({
-            root,
-            index,
-        }: {
-            root: Link
-            index: RootIndex
-        }) => Promise<{
-            vertexOffset: Offset
-            edgeOffset: Offset
-            propOffset: Offset
-            indexOffset: Offset
-        }>
-        verticesAll: ({
-            root,
-            index,
-        }: {
-            root: Link
-            index: RootIndex
-        }) => Promise<Vertex[]>
-        edgesAll: ({
-            root,
-            index,
-        }: {
-            root: Link
-            index: RootIndex
-        }) => Promise<Edge[]>
-        propsAll: ({
-            root,
-            index,
-        }: {
-            root: Link
-            index: RootIndex
-        }) => Promise<Prop[]>
-        commit: (
-            { root, index }: { root: Link; index: RootIndex },
-            {
-                vertices,
-                edges,
-                props,
-            }: {
-                vertices: {
-                    added: Map<number, Vertex>
-                    updated: Map<number, Vertex>
-                }
-                edges: {
-                    added: Map<number, Edge>
-                    updated: Map<number, Edge>
-                }
-                props: {
-                    added: Map<number, Prop>
-                    updated: Map<number, Prop>
-                }
-                indices: {
-                    added: Map<number, Index>
-                    updated: Map<number, Index>
-                }
-            }
-        ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
-    }
-): ItemList => {
-    const graph = new Graph(
-        {
-            versionSet,
-            rootGet,
-        },
-        {
-            vertexGet,
-            edgeGet,
-            propGet,
-            indexGet,
-            offsetsGet,
-            verticesAll,
-            edgesAll,
-            propsAll,
-            commit,
-        }
-    )
+interface Item {
+    value: ItemValue
+    ref: ItemRef
+}
 
+const itemListFactory = (
+    versionStore: VersionStore,
+    graphStore: GraphStore
+): ItemList => {
+    const graph = new Graph(versionStore, graphStore)
     const tx = (): ItemListTransaction => {
         return new ItemListTransaction(graph.tx())
     }
-    const get = async (index: number): Promise<ItemValue> => {
+    const get = async (index: number): Promise<Item> => {
         const offset = index * OFFSET_INCREMENTS.VERTEX_INCREMENT
+        const ref = { index, offset }
         const vertex: Vertex = await graph.getVertex(offset)
         const props: Prop[] = await graph.getVertexProps(vertex)
-        const itemValue = new Map<number, any>()
+        const value = new Map<number, any>()
         for (const prop of props) {
-            itemValue.set(prop.key, prop.value)
+            value.set(prop.key, prop.value)
         }
-        return itemValue
+        return { ref, value }
     }
-    const length = async (): Promise<number> => {
-        const { root, index } = await rootGet()
-        const { vertexOffset } = await offsetsGet({ root, index })
-        return vertexOffset / OFFSET_INCREMENTS.VERTEX_INCREMENT
-    }
-    const all = async (): Promise<ItemValue[]> => {
-        const { root, index } = await rootGet()
-        const vertices: Vertex[] = await verticesAll({ root, index })
-        const items: ItemValue[] = []
+    const range = async (startIndex: number, itemCount: number): Promise<Item[]> => {
+        const items: Item[] = []
+        const vertices: Vertex[] = await graph.getVertexRange( startIndex * OFFSET_INCREMENTS.VERTEX_INCREMENT, itemCount)
+        let index = startIndex
         for (const vertex of vertices) {
             const props: Prop[] = await graph.getVertexProps(vertex)
-            const itemValue = new Map<number, any>()
+            const value = new Map<number, any>()
             for (const prop of props) {
-                itemValue.set(prop.key, prop.value)
+                value.set(prop.key, prop.value)
             }
-            items.push(itemValue)
+            const ref = { index, offset: vertex.offset }
+            items.push({ ref, value })
+            index++
         }
         return items
     }
 
-    return { tx, get, length, all }
+    const length = async (): Promise<number> => {
+        const { root, index } = await versionStore.rootGet()
+        const { vertexOffset } = await graphStore.offsetsGet({ root, index })
+        return vertexOffset / OFFSET_INCREMENTS.VERTEX_INCREMENT
+    }
+
+    return { tx, get, range, length }
 }
 
 enum ItemTypes {
@@ -228,4 +125,11 @@ class ItemListTransaction {
     }
 }
 
-export { ItemList, ItemValue, ItemRef, ItemListTransaction, itemListFactory }
+export {
+    ItemList,
+    ItemValue,
+    ItemRef,
+    Item,
+    ItemListTransaction,
+    itemListFactory,
+}

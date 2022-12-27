@@ -100,14 +100,29 @@ class Graph implements ElementAccessor {
         { root, index }: { root: Link; index: RootIndex },
         offset: number
     ) => Promise<Vertex>
+    vertexRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        count: number
+    ) => Promise<Vertex[]>
     edgeGet: (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
     ) => Promise<Edge>
+    edgeRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        count: number
+    ) => Promise<Edge[]>
     propGet: (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
     ) => Promise<Prop>
+    propRange: (
+        { root, index }: { root: Link; index: RootIndex },
+        offset: number,
+        count: number
+    ) => Promise<Prop[]>
     indexGet: (
         { root, index }: { root: Link; index: RootIndex },
         offset: number
@@ -175,8 +190,11 @@ class Graph implements ElementAccessor {
         },
         {
             vertexGet,
+            vertexRange,
             edgeGet,
+            edgeRange,
             propGet,
+            propRange,
             indexGet,
             offsetsGet,
             verticesAll,
@@ -188,14 +206,29 @@ class Graph implements ElementAccessor {
                 { root, index }: { root: Link; index: RootIndex },
                 offset: number
             ) => Promise<Vertex>
+            vertexRange: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number,
+                vertexCount: number
+            ) => Promise<Vertex[]>
             edgeGet: (
                 { root, index }: { root: Link; index: RootIndex },
                 offset: number
             ) => Promise<Edge>
+            edgeRange: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number,
+                edgeCount: number
+            ) => Promise<Edge[]>
             propGet: (
                 { root, index }: { root: Link; index: RootIndex },
                 offset: number
             ) => Promise<Prop>
+            propRange: (
+                { root, index }: { root: Link; index: RootIndex },
+                offset: number,
+                propCount: number
+            ) => Promise<Prop[]>
             indexGet: (
                 { root, index }: { root: Link; index: RootIndex },
                 offset: number
@@ -271,8 +304,11 @@ class Graph implements ElementAccessor {
         this.versionSet = versionSet
         this.rootGet = rootGet
         this.vertexGet = vertexGet
+        this.vertexRange = vertexRange
         this.edgeGet = edgeGet
+        this.edgeRange = edgeRange
         this.propGet = propGet
+        this.propRange = propRange
         this.indexGet = indexGet
         this.offsetsGet = offsetsGet
         this.verticesAll = verticesAll
@@ -292,6 +328,23 @@ class Graph implements ElementAccessor {
         return vertex
     }
 
+    async getVertexRange(
+        startRef: VertexRef,
+        vertexCount: number
+    ): Promise<Vertex[]> {
+        const vertices: Vertex[] = await this.vertexRange(
+            await this.rootGet(),
+            startRef,
+            vertexCount
+        )
+        let vertexRef = startRef
+        for (let i = 0; i < vertexCount; i++) {
+            this.vertices.set(vertexRef, vertices[i])
+            vertexRef += OFFSET_INCREMENTS.VERTEX_INCREMENT
+        }
+        return vertices
+    }
+
     async getEdge(ref: EdgeRef): Promise<Edge> {
         let edge: Edge = this.edges.get(ref)
         if (edge === undefined) {
@@ -301,6 +354,20 @@ class Graph implements ElementAccessor {
         return edge
     }
 
+    async getEdgeRange(startRef: EdgeRef, edgeCount: number): Promise<Edge[]> {
+        const edges: Edge[] = await this.edgeRange(
+            await this.rootGet(),
+            startRef,
+            edgeCount
+        )
+        let edgeRef = startRef
+        for (let i = 0; i < edgeCount; i++) {
+            this.edges.set(edgeRef, edges[i])
+            edgeRef += OFFSET_INCREMENTS.EDGE_INCREMENT
+        }
+        return edges
+    }
+
     async getProp(ref: PropRef): Promise<Prop> {
         let prop: Prop = this.props.get(ref)
         if (prop === undefined) {
@@ -308,6 +375,20 @@ class Graph implements ElementAccessor {
             this.props.set(ref, prop)
         }
         return prop
+    }
+
+    async getPropRange(startRef: PropRef, propCount: number): Promise<Prop[]> {
+        const props: Prop[] = await this.propRange(
+            await this.rootGet(),
+            startRef,
+            propCount
+        )
+        let propRef = startRef
+        for (let i = 0; i < propCount; i++) {
+            this.props.set(propRef, props[i])
+            propRef += OFFSET_INCREMENTS.PROP_INCREMENT
+        }
+        return props
     }
 
     async getIndex(ref: IndexRef): Promise<Index> {
@@ -415,7 +496,6 @@ class Graph implements ElementAccessor {
             await this.getNextProps(prop.nextProp, props)
         }
     }
-
 
     tx() {
         return new Tx(this)
