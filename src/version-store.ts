@@ -1,6 +1,6 @@
 import { BlockStore } from './block-store'
-import { BlockCodec, LinkCodec } from './codecs'
-import { Link, RootIndex, Version } from './types'
+import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
+import { Link, RootIndex, Version, VersionDetails } from './types'
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { VersionDecoder, VersionEncoder } from './serde'
 import { v4 as uuidV4, parse as uuidParse } from 'uuid'
@@ -50,7 +50,7 @@ const versionStoreFactory = async ({
     versionRoot,
     chunk,
     linkCodec,
-    blockCodec,
+    valueCodec,
     blockStore,
 }: {
     readOnly?: boolean
@@ -58,7 +58,7 @@ const versionStoreFactory = async ({
     versionRoot?: Link
     chunk: (buffer: Uint8Array) => Uint32Array
     linkCodec: LinkCodec
-    blockCodec: BlockCodec
+    valueCodec: ValueCodec
     blockStore: BlockStore
 }): Promise<VersionStore> => {
     const versions = new Map<string, Version>()
@@ -84,13 +84,11 @@ const versionStoreFactory = async ({
                 decode: linkCodec.decode,
                 get: blockStore.get,
             })
-            const { id: storeId, versions: versionArray } =
-                await new VersionDecoder(
-                    bytes,
-                    linkCodec.decode,
-                    blockCodec.decode,
-                    blockStore.get
-                ).read()
+            const { id: storeId, versions: versionArray } = new VersionDecoder(
+                bytes,
+                linkCodec.decode,
+                valueCodec.decode
+            ).read()
             byteArrayRoot = storeRoot
             versionArray.forEach((v) => versions.set(v.root.toString(), v))
             identity = storeId
@@ -119,11 +117,10 @@ const versionStoreFactory = async ({
         currentVersion = version.root.toString()
 
         if (!readOnly) {
-            const buf = await new VersionEncoder(
+            const buf = new VersionEncoder(
                 identity,
                 Array.from(versions.values()),
-                blockCodec.encode,
-                blockStore.put
+                valueCodec.encode
             ).write()
 
             const { root, blocks } = await create({
@@ -163,7 +160,8 @@ const versionStoreFactory = async ({
         root: Link
         index?: RootIndex
     }): Promise<Link> => {
-        const version: Version = { root }
+        const details: VersionDetails = { timestamp: Date.now() }
+        const version: Version = { root, details }
         return await versionSet({ version, index })
     }
 

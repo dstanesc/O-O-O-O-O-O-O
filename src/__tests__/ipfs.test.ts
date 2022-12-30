@@ -8,8 +8,6 @@ import { blockStore as ipfsBlockStore } from '@dstanesc/ipfs-block-store'
 import {
     LinkCodec,
     linkCodecFactory,
-    BlockCodec,
-    blockCodecFactory,
     valueCodecFactory,
     ValueCodec,
 } from '../codecs'
@@ -76,7 +74,6 @@ describe('IPFS block-store', function () {
             const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const valueCodec: ValueCodec = valueCodecFactory()
-            const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
             const versionRoot = linkCodec.parseString(
                 'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
@@ -85,7 +82,7 @@ describe('IPFS block-store', function () {
                 versionRoot,
                 chunk,
                 linkCodec,
-                blockCodec,
+                valueCodec,
                 blockStore,
             })
 
@@ -112,7 +109,6 @@ describe('IPFS block-store', function () {
             const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
             const linkCodec: LinkCodec = linkCodecFactory()
             const valueCodec: ValueCodec = valueCodecFactory()
-            const blockCodec: BlockCodec = blockCodecFactory()
             const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
             const versionRoot = linkCodec.parseString(
                 'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
@@ -121,7 +117,7 @@ describe('IPFS block-store', function () {
                 versionRoot,
                 chunk,
                 linkCodec,
-                blockCodec,
+                valueCodec,
                 blockStore,
             })
 

@@ -155,7 +155,6 @@ const merge = async (
     chunk: (buffer: Uint8Array) => Uint32Array,
     linkCodec: LinkCodec,
     valueCodec: ValueCodec,
-    blockCodec: BlockCodec,
 ) => {
     const mergeOrder = <T>({ current, other }: { current: T; other: T }) => {
         return currentRoot.bytes[0] < otherRoot.bytes[0]
@@ -219,7 +218,7 @@ const merge = async (
     const story: VersionStore = await versionStoreFactory({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore: firstStore,
     })
 

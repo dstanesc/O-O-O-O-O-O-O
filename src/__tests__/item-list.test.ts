@@ -1,7 +1,5 @@
 import {
     linkCodecFactory,
-    blockCodecFactory,
-    BlockCodec,
     LinkCodec,
     ValueCodec,
     valueCodecFactory,
@@ -9,7 +7,6 @@ import {
 import { graphStore } from '../graph-store'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
-import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
 import * as assert from 'assert'
 import { VersionStore, versionStoreFactory } from '../version-store'
@@ -25,13 +22,12 @@ describe('Minimal item list', function () {
     test('internal api, creation and retrieval by index', async () => {
         const { chunk } = chunkerFactory(512, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -136,7 +132,7 @@ describe('Minimal item list', function () {
             versionRoot,
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const itemList3: ItemList = itemListFactory(versionStore2, store)
@@ -181,16 +177,15 @@ describe('Minimal item list', function () {
         assert.strictEqual('item 2', item17.value.get(KeyTypes.NAME))
     })
 
-    test('internal api, creation and range retrieval, rangex', async () => {
+    test('internal api, creation and range retrieval', async () => {
         const { chunk } = chunkerFactory(512, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -217,6 +212,7 @@ describe('Minimal item list', function () {
             tags: ['v0.0.1'],
         })
 
+        console.log(`root: ${root.toString()}`)
         /**
          * Item range from 25 to 75
          */

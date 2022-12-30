@@ -4,8 +4,6 @@ import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
 import {
-    BlockCodec,
-    blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
     ValueCodec,
@@ -44,7 +42,6 @@ enum KeyTypes {
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 describe('Merge graphs', function () {
@@ -55,7 +52,7 @@ describe('Merge graphs', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -172,8 +169,7 @@ describe('Merge graphs', function () {
             MergePolicyEnum.MultiValueRegistry,
             chunk,
             linkCodec,
-            valueCodec,
-            blockCodec
+            valueCodec
         )
 
         const mergedFilesMvr = await query(mergeRootMvr)
@@ -206,8 +202,7 @@ describe('Merge graphs', function () {
             MergePolicyEnum.LastWriterWins,
             chunk,
             linkCodec,
-            valueCodec,
-            blockCodec
+            valueCodec
         )
 
         const mergedFilesLww = await query(mergeRootLww)
@@ -226,7 +221,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         versionRoot,
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
     const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })

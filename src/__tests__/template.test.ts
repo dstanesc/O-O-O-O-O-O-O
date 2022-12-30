@@ -44,7 +44,6 @@ enum KeyTypes {
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 describe('Extract graph data fragments', function () {
@@ -55,7 +54,7 @@ describe('Extract graph data fragments', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 

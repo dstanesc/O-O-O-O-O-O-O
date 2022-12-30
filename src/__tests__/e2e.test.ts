@@ -12,8 +12,6 @@ import {
 import {
     LinkCodec,
     linkCodecFactory,
-    BlockCodec,
-    blockCodecFactory,
     ValueCodec,
     valueCodecFactory,
 } from '../codecs'
@@ -65,12 +63,11 @@ describe('e2e ', function () {
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -177,7 +174,7 @@ describe('e2e ', function () {
             versionRoot: undefined, // HEAD, can be omitted
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore: blockStore2,
         })
 
@@ -222,12 +219,11 @@ describe('e2e ', function () {
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -365,12 +361,11 @@ describe('e2e ', function () {
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const indexStore = indexStoreFactory(blockStore)
@@ -494,12 +489,11 @@ describe('e2e ', function () {
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: MemoryBlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 

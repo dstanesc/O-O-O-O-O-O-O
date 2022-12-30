@@ -4,8 +4,6 @@ import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
 import {
-    BlockCodec,
-    blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
     ValueCodec,
@@ -13,9 +11,7 @@ import {
 } from '../codecs'
 import * as assert from 'assert'
 import { navigateVertices, PathElemType, RequestBuilder } from '../navigate'
-import { eq } from '../ops'
 import { Link, Offset, Part, Prop, Comment, Tag } from '../types'
-import { merge, MergePolicyEnum } from '../merge'
 import { VersionStore, versionStoreFactory } from '../version-store'
 
 /**
@@ -44,7 +40,6 @@ enum KeyTypes {
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 describe('Version management', function () {
@@ -55,7 +50,7 @@ describe('Version management', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -172,9 +167,9 @@ describe('Version management', function () {
             linkCodec.encodeString(versions[0].parent),
             'bafkreia7homtnphv3je3iwlfl6y3gmdrqrakswsl5sqpcw3gfz25wyfm4q'
         )
-        assert.strictEqual(versions[0].comment, 'First release')
-        assert.strictEqual(versions[0].tags.length, 1)
-        assert.strictEqual(versions[0].tags[0], 'v0.1.0')
+        assert.strictEqual(versions[0].details.comment, 'First release')
+        assert.strictEqual(versions[0].details.tags.length, 1)
+        assert.strictEqual(versions[0].details.tags[0], 'v0.1.0')
 
         assert.strictEqual(
             linkCodec.encodeString(versions[1].root),
@@ -184,18 +179,18 @@ describe('Version management', function () {
             linkCodec.encodeString(versions[1].parent),
             'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
-        assert.strictEqual(versions[1].comment, 'Second draft')
-        assert.strictEqual(versions[1].tags.length, 1)
-        assert.strictEqual(versions[1].tags[0], 'v0.0.2')
+        assert.strictEqual(versions[1].details.comment, 'Second draft')
+        assert.strictEqual(versions[1].details.tags.length, 1)
+        assert.strictEqual(versions[1].details.tags[0], 'v0.0.2')
 
         assert.strictEqual(
             linkCodec.encodeString(versions[2].root),
             'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[2].parent, undefined)
-        assert.strictEqual(versions[2].comment, 'First draft')
-        assert.strictEqual(versions[2].tags.length, 1)
-        assert.strictEqual(versions[2].tags[0], 'v0.0.1')
+        assert.strictEqual(versions[2].details.comment, 'First draft')
+        assert.strictEqual(versions[2].details.tags.length, 1)
+        assert.strictEqual(versions[2].details.tags[0], 'v0.0.1')
 
         const files = await query(second)
 
@@ -213,7 +208,7 @@ describe('Version management', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -377,18 +372,18 @@ describe('Version management', function () {
             linkCodec.encodeString(versions[0].parent),
             'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
-        assert.strictEqual(versions[0].comment, 'Second release')
-        assert.strictEqual(versions[0].tags.length, 1)
-        assert.strictEqual(versions[0].tags[0], 'v0.2.0')
+        assert.strictEqual(versions[0].details.comment, 'Second release')
+        assert.strictEqual(versions[0].details.tags.length, 1)
+        assert.strictEqual(versions[0].details.tags[0], 'v0.2.0')
 
         assert.strictEqual(
             linkCodec.encodeString(versions[3].root),
             'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
         )
         assert.strictEqual(versions[3].parent, undefined)
-        assert.strictEqual(versions[3].comment, 'First draft')
-        assert.strictEqual(versions[3].tags.length, 1)
-        assert.strictEqual(versions[3].tags[0], 'v0.0.1')
+        assert.strictEqual(versions[3].details.comment, 'First draft')
+        assert.strictEqual(versions[3].details.tags.length, 1)
+        assert.strictEqual(versions[3].details.tags[0], 'v0.0.1')
     })
 })
 
@@ -397,7 +392,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         versionRoot,
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
     const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })

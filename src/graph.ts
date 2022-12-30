@@ -23,6 +23,7 @@ import {
     Version,
     Comment,
     Tag,
+    VersionDetails,
 } from './types'
 
 import { OFFSET_INCREMENTS } from './serde'
@@ -900,11 +901,16 @@ class Tx implements ElementAccessor {
             indices: this.indices,
         })
 
+        const versionDetails: VersionDetails = {
+            comment,
+            tags,
+            timestamp: Date.now(),
+        }
+
         const version: Version = {
             root,
             parent: rootBefore.root,
-            comment,
-            tags,
+            details: versionDetails,
         }
 
         await this.graph.versionSet({ version, index })

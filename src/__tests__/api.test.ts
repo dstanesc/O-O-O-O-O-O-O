@@ -1,10 +1,7 @@
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import {
-    BlockCodec,
     LinkCodec,
     linkCodecFactory,
-    blockCodecFactory,
-    multiBlockCodecFactory,
     valueCodecFactory,
     ValueCodec,
 } from '../codecs'
@@ -28,8 +25,6 @@ import { VersionStore, versionStoreFactory } from '../version-store'
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
-const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 
 describe('Api', function () {
     test('internal, minimal creation, proto-schema aware, deterministic root and offsets', async () => {
@@ -54,7 +49,7 @@ describe('Api', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -129,7 +124,7 @@ describe('Api', function () {
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -195,7 +190,7 @@ describe('Api', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({
@@ -429,7 +424,7 @@ describe('Api', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -528,7 +523,7 @@ async function createSchemaAwareGraph() {
     const story: VersionStore = await versionStoreFactory({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
     const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })

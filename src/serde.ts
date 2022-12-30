@@ -1,3 +1,4 @@
+import { fastCloneVersionDetails } from './clone'
 import {
     Vertex,
     Edge,
@@ -12,6 +13,7 @@ import {
     Status,
     Part,
     Version,
+    VersionDetails,
     Tag,
     Offset,
     ValueRef,
@@ -482,7 +484,7 @@ class PropEncoder extends BinaryEncoder {
             this.writeType(prop.type)
         else this.skipType()
         this.writeUInt(prop.key) // 4
-        await this.writeValue(prop.offset, prop.value) // 9
+        await this.writeValue(prop.offset, prop.value) // 13
         if (prop.nextProp !== undefined)
             // 5
             this.writeRef(prop.nextProp)
@@ -548,7 +550,11 @@ class PropValueEncoder extends BinaryEncoder {
     props: Prop[]
     valueEncode: (json: any) => Uint8Array
     refOffset: number
-    constructor (refOffset: number, props: Prop[], valueEncode: (json: any) => Uint8Array) {
+    constructor(
+        refOffset: number,
+        props: Prop[],
+        valueEncode: (json: any) => Uint8Array
+    ) {
         super(
             props
                 .map((prop) => valueEncode(prop.value).byteLength)
@@ -784,133 +790,86 @@ class RootDecoder extends BinaryDecoder {
     }
 }
 
-const VERSION_SIZE_BYTES = 147
+const VERSION_CONST_SIZE_BYTES = 77
 const VERSION_ID_SIZE_BYTES = 36
 
 class VersionEncoder extends BinaryEncoder {
     id: Link
     versions: Version[]
-    blockEncode: (
-        json: any,
-        blockPut: (block: Block) => Promise<void>
-    ) => Promise<Link>
-    blockPut: (block: Block) => Promise<void>
+    valueEncode: (json: any) => Uint8Array
     constructor(
         id: Link,
         versions: Version[],
-        blockEncode: (
-            json: any,
-            blockPut: (block: Block) => Promise<void>
-        ) => Promise<Link>,
-        blockPut: (block: Block) => Promise<void>
+        valueEncode: (json: any) => Uint8Array
     ) {
-        super(VERSION_ID_SIZE_BYTES + versions.length * VERSION_SIZE_BYTES)
+        super(
+            VERSION_ID_SIZE_BYTES +
+                versions
+                    .map(
+                        (version) =>
+                            valueEncode(version.details).byteLength +
+                            VERSION_CONST_SIZE_BYTES
+                    )
+                    .reduce((a, b) => a + b, 0)
+        )
         this.id = id
         this.versions = versions
-        this.blockEncode = blockEncode
-        this.blockPut = blockPut
+        this.valueEncode = valueEncode
     }
-    async writeComment(value: Comment) {
-        // 36
-        const link: Link = await this.blockEncode(value, this.blockPut)
-        this.writeLink(link) // 36
+    writeDetails(details: VersionDetails) {
+        const bytes: Uint8Array = this.valueEncode(details)
+        const length = bytes.byteLength
+        this.writeUInt(length) // 4
+        this.writeBytes(bytes) // n
     }
-
-    async writeTags(tags: Tag[]) {
-        // 36
-        const link: Link = await this.blockEncode(tags, this.blockPut)
-        this.writeLink(link) // 36
-    }
-
     async writeVersion(version: Version) {
         this.writeLink(version.root) // 36
         if (version.parent !== undefined) {
             this.writeLinkExists() // 1
             this.writeLink(version.parent) // 36
         } else this.skipBytes(37)
-        if (version.comment !== undefined) {
-            this.writeLinkExists() // 1
-            await this.writeComment(version.comment)
-        } else this.skipBytes(37)
-        if (version.tags !== undefined) {
-            this.writeLinkExists() // 1
-            await this.writeTags(version.tags)
-        } else this.skipBytes(37)
+        this.writeDetails(version.details) // 4 + n
     }
-    async write() {
+    write() {
         this.writeLink(this.id) // 36
-        for (const version of this.versions) await this.writeVersion(version)
+        for (const version of this.versions) this.writeVersion(version)
         return this.content()
     }
 }
 
 class VersionDecoder extends BinaryDecoder {
     linkDecode: (linkBytes: Uint8Array) => Link
-    blockDecode: (
-        link: Link,
-        blockGet: (cid: any) => Promise<Uint8Array>
-    ) => Promise<PropValue>
-    blockGet: (cid: any) => Promise<Uint8Array>
-
+    valueDecode: (bytes: Uint8Array) => any
     constructor(
         buffer: Uint8Array,
         linkDecode: (linkBytes: Uint8Array) => Link,
-        blockDecode: (
-            link: Link,
-            blockGet: (cid: any) => Promise<Uint8Array>
-        ) => Promise<PropValue>,
-        blockGet: (cid: any) => Promise<Uint8Array>
+        valueDecode: (bytes: Uint8Array) => any
     ) {
         super(buffer)
         this.linkDecode = linkDecode
-        this.blockDecode = blockDecode
-        this.blockGet = blockGet
+        this.valueDecode = valueDecode
     }
 
-    async readOptionalComment(): Promise<Comment | undefined> {
-        const link: Link = this.readOptionalLink(this.linkDecode)
-        if (link !== undefined) {
-            const comment: Comment = await this.blockDecode(link, this.blockGet)
-            return comment
-        } else return undefined
+    readVersionDetails(): VersionDetails {
+        const length = this.readUInt()
+        const bytes = this.readBytes(length)
+        return fastCloneVersionDetails(this.valueDecode(bytes))
     }
 
-    async readOptionalTags(): Promise<Tag[] | undefined> {
-        const link: Link = this.readOptionalLink(this.linkDecode)
-        if (link !== undefined) {
-            const tags: Tag[] = await this.blockDecode(link, this.blockGet)
-            return tags
-        } else return undefined
-    }
-
-    async readVersion(): Promise<Version> {
+    readVersion(): Version {
         const root = this.readLink(this.linkDecode)
-        const version: Version = { root }
         const parent = this.readOptionalLink(this.linkDecode)
-        const comment = await this.readOptionalComment()
-        const tags = await this.readOptionalTags()
-        if (parent !== undefined) version.parent = parent
-        if (comment !== undefined) version.comment = comment
-        if (tags !== undefined) version.tags = tags
-        return version
+        const details = this.readVersionDetails()
+        return parent === undefined
+            ? { root, details }
+            : { root, parent, details }
     }
 
-    async read(): Promise<{ id: Link; versions: Version[] }> {
-        if (
-            (this.buffer.byteLength - VERSION_ID_SIZE_BYTES) %
-                VERSION_SIZE_BYTES !==
-            0
-        )
-            throw new Error('Invalid version serialization')
+    read(): { id: Link; versions: Version[] } {
         const id: Link = this.readLink(this.linkDecode)
-        const size = Math.trunc(
-            (this.buffer.byteLength - VERSION_ID_SIZE_BYTES) /
-                VERSION_SIZE_BYTES
-        )
         const versions = []
-        for (let i = 0; i < size; i++) {
-            versions.push(await this.readVersion())
-        }
+        while (this.cursor < this.buffer.byteLength)
+            versions.push(this.readVersion())
         return { id, versions }
     }
 }
@@ -920,7 +879,6 @@ const OFFSET_INCREMENTS = {
     EDGE_INCREMENT: EDGE_SIZE_BYTES,
     PROP_INCREMENT: PROP_SIZE_BYTES,
     INDEX_INCREMENT: INDEX_SIZE_BYTES,
-    VERSION_INCREMENT: VERSION_SIZE_BYTES,
 }
 
 export {

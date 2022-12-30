@@ -1,7 +1,5 @@
 import {
     linkCodecFactory,
-    blockCodecFactory,
-    BlockCodec,
     LinkCodec,
     valueCodecFactory,
     ValueCodec,
@@ -41,12 +39,11 @@ describe('Filter data', function () {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -135,12 +132,11 @@ describe('Filter data', function () {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -208,12 +204,11 @@ describe('Filter data', function () {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 

@@ -4,8 +4,6 @@ import { graphStore } from '../graph-store'
 import { Graph } from '../graph'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
 import {
-    BlockCodec,
-    blockCodecFactory,
     LinkCodec,
     linkCodecFactory,
     ValueCodec,
@@ -17,7 +15,6 @@ import { deltaFactory } from '../delta'
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 
 import * as assert from 'assert'
@@ -28,7 +25,7 @@ describe('Multi tx', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -88,7 +85,7 @@ describe('Multi tx', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })

@@ -10,8 +10,6 @@ import {
 import {
     LinkCodec,
     linkCodecFactory,
-    BlockCodec,
-    blockCodecFactory,
     ValueCodec,
     valueCodecFactory,
 } from './codecs'
@@ -65,7 +63,6 @@ const lines = str.split(/\r?\n/g)
 async function publish() {
     const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
-    const blockCodec: BlockCodec = blockCodecFactory()
     const valueCodec: ValueCodec = valueCodecFactory()
     const cache = {}
     const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
@@ -73,7 +70,7 @@ async function publish() {
     const versionStore: VersionStore = await versionStoreFactory({
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
 
@@ -131,7 +128,7 @@ async function publish() {
             .toString()}`
     )
 
-    // root=bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi, storeRoot=bafkreibtbm2c3qwdw64kir67ee3yipn5xi2wcpi2sqfwndg5z6wsqayyna
+    // root=bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi, storeRoot=bafkreiedmcs5c7ptckhdy2phhra65xridwt3ut7zozhou3qy3risqtrx2q
 }
 
 async function query() {
@@ -139,7 +136,6 @@ async function query() {
     const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
     const valueCodec: ValueCodec = valueCodecFactory()
-    const blockCodec: BlockCodec = blockCodecFactory()
     const resolver = (cid: any) =>
         `http://192.168.1.205:8080/ipfs/${cid.toString()}`
     const blockStore = httpBlockStore({ cache, resolver })
@@ -151,7 +147,7 @@ async function query() {
         versionRoot,
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
 

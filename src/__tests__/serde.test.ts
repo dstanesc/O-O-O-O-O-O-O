@@ -164,8 +164,11 @@ describe('Serde validation with', function () {
             root: CID.parse(
                 'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
             ),
-            comment: 'First commit',
-            tags: ['tag0', 'tag1'],
+            details: {
+                comment: 'First commit',
+                tags: ['tag0', 'tag1'],
+                timestamp: 123456789,
+            },
         }
 
         const v2: Version = {
@@ -175,8 +178,13 @@ describe('Serde validation with', function () {
             parent: CID.parse(
                 'bafkreidhv2kilqj6eydivvatngsrtbcbifiij33tnq6zww7u34kit536q4'
             ),
-            comment: 'Second commit',
-            tags: ['tag2'],
+            details: {
+                comment: 'Second commit',
+                tags: ['tag2'],
+                timestamp: 123456789,
+                author: 'John Doe',
+                signature: '5623b3e80b85ab83e060bf73f45ea8550db215fc',
+            },
         }
 
         const v3: Version = {
@@ -186,24 +194,25 @@ describe('Serde validation with', function () {
             parent: CID.parse(
                 'bafkreicklvs2aaeqfvs6f2pgcki2gont35chka2loq7mlah7yu4tj6bsvy'
             ),
-            comment: 'Third commit',
-            tags: ['tag3'],
+            details: {
+                comment: 'Third commit',
+                tags: ['tag3'],
+                timestamp: 123456789,
+            },
         }
 
-        const bytes = await new VersionEncoder(
+        const bytes = new VersionEncoder(
             CID.parse(
                 'bafkreibygummtcvcgmld7re3s4kjfoaf4z3zgxsdsqdmh3baom4suvgnem'
             ),
             [v1, v2, v3],
-            blockEncode,
-            blockPut
+            valueEncode
         ).write()
 
-        const { id, versions } = await new VersionDecoder(
+        const { id, versions } = new VersionDecoder(
             bytes,
             linkDecode,
-            blockDecode,
-            blockGet
+            valueDecode
         ).read()
         assert.deepEqual([v1, v2, v3], versions)
     })

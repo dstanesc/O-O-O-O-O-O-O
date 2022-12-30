@@ -2,7 +2,6 @@
 
 ![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Neo4j inspired index-free adjacency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
 
-
 ## Demo
 
 Graph navigation using IPFS [Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
@@ -20,13 +19,12 @@ enum KeyTypes {
 }
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
 const blockStore: BlockStore = memoryBlockStoreFactory()
 const versionStore: VersionStore = await versionStoreFactory({
     chunk,
     linkCodec,
-    blockCodec,
+    valueCodec,
     blockStore,
 })
 const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -43,6 +41,7 @@ const { root, index, blocks } = await tx.commit({
     comment: 'First commit',
     tags: ['v0.0.1'],
 })
+// root: bafkreieiuo4jtrhchzswsoromg5w5q4jv734bpt2xb37nlfwsc2usqipre
 ```
 
 The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
@@ -87,17 +86,17 @@ enum KeyTypes {
 
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
-const blockStore: BlockStore = memoryBlockStoreFactory() // memory store
-const story: VersionStore = await versionStoreFactory({
+const valueCodec: ValueCodec = valueCodecFactory()
+const blockStore: BlockStore = memoryBlockStoreFactory()
+const versionStore: VersionStore = await versionStoreFactory({
     chunk,
     linkCodec,
-    blockCodec,
+    valueCodec,
     blockStore,
 })
-const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
-const graph = new Graph(story, store)
+const graph = new Graph(versionStore, store)
 
 const tx = graph.tx()
 
@@ -140,10 +139,10 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         versionRoot,
         chunk,
         linkCodec,
-        blockCodec,
+        valueCodec,
         blockStore,
     })
-    const store = graphStore({ chunk, linkCodec, blockCodec, blockStore })
+    const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
     const graph = new Graph(versionStore, store)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)
@@ -161,6 +160,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
     return vr
 }
 ```
+
 _WIP_
 
 ... or extract coarser data fragments using data templates. Proto-language / syntax still under evaluation, hinting towards GraphQL.
@@ -194,7 +194,6 @@ for await (const result of navigateVertices(graph, [0], request)) {
     vr.push(result)
 }
 ```
-
 
 ## Multiple block stores
 

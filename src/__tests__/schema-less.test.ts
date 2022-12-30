@@ -1,7 +1,5 @@
 import {
     linkCodecFactory,
-    blockCodecFactory,
-    BlockCodec,
     LinkCodec,
     ValueCodec,
     valueCodecFactory,
@@ -22,13 +20,12 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
     test('internal api creation', async () => {
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -60,12 +57,11 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 
@@ -102,12 +98,11 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
@@ -157,12 +152,11 @@ describe('Minimal, schema-less creation and navigation deterministic root', func
         const { chunk } = chunkerFactory(1024, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
-        const blockCodec: BlockCodec = blockCodecFactory()
         const blockStore: BlockStore = memoryBlockStoreFactory()
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
 

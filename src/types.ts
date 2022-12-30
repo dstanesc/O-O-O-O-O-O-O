@@ -53,7 +53,7 @@ type PropRef = Ref & {}
 type IndexRef = Ref & {}
 
 type ValueRef = {
-    propRef: PropRef
+    propRef: Ref
     ref: Ref
     length: number
 }
@@ -118,8 +118,15 @@ type Tag = any
 type Version = {
     root: Link
     parent?: Link
+    details: VersionDetails
+}
+
+type VersionDetails = {
     comment?: Comment
     tags?: Tag[]
+    author?: string
+    signature?: any
+    timestamp: number
 }
 
 // function isShortString<MaxBytes>(text: string, maxBytes: MaxBytes): text is ShortString<MaxBytes> {
@@ -160,6 +167,7 @@ export {
     RootStruct,
     RootIndex,
     Version,
+    VersionDetails,
     Comment,
     Tag,
 }

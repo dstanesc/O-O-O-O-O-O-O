@@ -4,23 +4,18 @@ import { chunkerFactory } from '../chunking'
 import {
     LinkCodec,
     linkCodecFactory,
-    BlockCodec,
-    blockCodecFactory,
-    multiBlockCodecFactory,
     ValueCodec,
     valueCodecFactory,
 } from '../codecs'
 import { Graph } from '../graph'
 import { graphStore } from '../graph-store'
+import * as assert from 'assert'
+import { Edge, EdgeRef } from '../types'
+import { VersionStore, versionStoreFactory } from '../version-store'
 
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
-const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
-import * as assert from 'assert'
-import { Edge, EdgeRef } from '../types'
-import { VersionStore, versionStoreFactory } from '../version-store'
 
 describe('Edge, fields computed on commit', function () {
     test('targetNext and targetPrev are properly set', async () => {
@@ -46,7 +41,7 @@ describe('Edge, fields computed on commit', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })

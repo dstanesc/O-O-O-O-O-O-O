@@ -8,9 +8,6 @@ import { chunkerFactory } from '../chunking'
 import {
     LinkCodec,
     linkCodecFactory,
-    BlockCodec,
-    blockCodecFactory,
-    multiBlockCodecFactory,
     ValueCodec,
     valueCodecFactory,
 } from '../codecs'
@@ -26,8 +23,6 @@ import { VersionStore, versionStoreFactory } from '../version-store'
 const { chunk } = chunkerFactory(1024, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
-const blockCodec: BlockCodec = blockCodecFactory()
-const multiBlockCodec: BlockCodec = multiBlockCodecFactory(chunk)
 
 describe('Indexing', function () {
     test('index store api', async () => {
@@ -65,7 +60,7 @@ describe('Indexing', function () {
         const story: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
-            blockCodec,
+            valueCodec,
             blockStore,
         })
         const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
