@@ -53,7 +53,7 @@ const item0 = await itemList.get(0)
 assert.strictEqual('item 0', item0.value.get(KeyTypes.NAME))
 ```
 
-Range access intended to minimize I/O by sequential reads at byte array level.
+Range access is performed w/ sequential reads at byte array level.
 
 ```ts
 const range: Item[] = await itemList.range(25, 50) // start index, count
@@ -65,9 +65,13 @@ for (let i = 0; i < range.length; i++) {
 
 ## Graph
 
-Authoring data graphs. Providing a `proto-schema` is optional. Below a graph structure mapping a pseudo file system:
+Authoring data graphs. Providing a `proto-schema` is optional. Below creating, updating in parallel and merging changes on a graph structure mimicking a file system:
 
 ```ts
+/**
+ * File system proto-schema
+ */
+
 enum ObjectTypes {
     FOLDER = 1,
     FILE = 2,
@@ -84,6 +88,9 @@ enum KeyTypes {
     CONTENT = 2,
 }
 
+/**
+ * Chunking alg., codecs, storage
+ */
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
@@ -96,6 +103,9 @@ const versionStore: VersionStore = await versionStoreFactory({
 })
 const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
 
+/**
+ * Build original data set
+ */
 const graph = new Graph(versionStore, store)
 
 const tx = graph.tx()
@@ -125,10 +135,130 @@ await tx.addVertexProp(
     PropTypes.DATA
 )
 
-const { root, index, blocks } = await tx.commit({
+const { root: original } = await tx.commit({
     comment: 'First draft',
     tags: ['v0.0.1'],
 })
+
+/**
+ * Revise original, first user
+ */
+
+const store1 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const g1 = new Graph(versionStore, store1)
+
+const tx1 = g1.tx()
+await tx1.start()
+const v10 = await tx1.getVertex(0)
+const v11 = tx1.addVertex(ObjectTypes.FILE)
+const e11 = await tx1.addEdge(v10, v11, RlshpTypes.CONTAINS)
+await tx1.addVertexProp(
+    v11,
+    KeyTypes.NAME,
+    'nested-file-user-1',
+    PropTypes.META
+)
+await tx1.addVertexProp(
+    v11,
+    KeyTypes.CONTENT,
+    'hello world from v11',
+    PropTypes.DATA
+)
+
+const { root: first } = await tx1.commit({
+    comment: 'Revised by first user',
+})
+
+/**
+ * Revise original, second user
+ */
+versionStore.checkout(original)
+
+const store2 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const g2 = new Graph(versionStore, store2)
+
+const tx2 = g2.tx()
+await tx2.start()
+const v20 = await tx2.getVertex(0)
+const v21 = tx2.addVertex(ObjectTypes.FILE)
+const e21 = await tx2.addEdge(v20, v21, RlshpTypes.CONTAINS)
+await tx2.addVertexProp(
+    v21,
+    KeyTypes.NAME,
+    'nested-file-user-2',
+    PropTypes.META
+)
+await tx2.addVertexProp(
+    v21,
+    KeyTypes.CONTENT,
+    'hello world from v21',
+    PropTypes.DATA
+)
+
+const { root: second } = await tx2.commit({
+    comment: 'Revised by second user',
+})
+
+/**
+ * Merge MultiValueRegistry
+ */
+
+const {
+    root: mergeRootMvr,
+    index: mergeIndexMvr,
+    blocks: mergeBlocksMvr,
+} = await merge(
+    {
+        baseRoot: original,
+        baseStore: blockStore,
+        currentRoot: first,
+        currentStore: blockStore,
+        otherRoot: second,
+        otherStore: blockStore,
+    },
+    MergePolicyEnum.MultiValueRegistry,
+    chunk,
+    linkCodec,
+    valueCodec
+)
+
+const mergedFilesMvr = await query(mergeRootMvr)
+
+assert.strictEqual(mergedFilesMvr.length, 4)
+assert.strictEqual(mergedFilesMvr[0].value, 'nested-folder')
+assert.strictEqual(mergedFilesMvr[1].value, 'nested-file')
+assert.strictEqual(mergedFilesMvr[2].value, 'nested-file-user-2')
+assert.strictEqual(mergedFilesMvr[3].value, 'nested-file-user-1')
+
+/**
+ * Merge LastWriterWins
+ */
+
+const {
+    root: mergeRootLww,
+    index: mergeIndexLww,
+    blocks: mergeBlocksLww,
+} = await merge(
+    {
+        baseRoot: original,
+        baseStore: blockStore,
+        currentRoot: first,
+        currentStore: blockStore,
+        otherRoot: second,
+        otherStore: blockStore,
+    },
+    MergePolicyEnum.LastWriterWins,
+    chunk,
+    linkCodec,
+    valueCodec
+)
+
+const mergedFilesLww = await query(mergeRootLww)
+
+assert.strictEqual(mergedFilesLww.length, 3)
+assert.strictEqual(mergedFilesLww[0].value, 'nested-folder')
+assert.strictEqual(mergedFilesLww[1].value, 'nested-file')
+assert.strictEqual(mergedFilesLww[2].value, 'nested-file-user-1')
 ```
 
 Navigate the graph, filter the data and extract vertex, edge or property information
@@ -148,7 +278,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         .add(PathElemType.VERTEX)
         .add(PathElemType.EDGE)
         .add(PathElemType.VERTEX)
-        .propPred(KeyTypes.CONTENT, eq('hello world from v3'))
+        // .propPred(KeyTypes.CONTENT, eq('hello world from v3'))
         .extract(KeyTypes.NAME)
         .maxResults(100)
         .get()
