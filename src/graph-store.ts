@@ -712,4 +712,4 @@ const graphStore = ({
     }
 }
 
-export { graphStore, GraphStore }
+export { graphStore, graphStore as graphStoreFactory, GraphStore }

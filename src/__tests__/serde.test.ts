@@ -24,6 +24,7 @@ import {
 } from '../serde'
 import * as assert from 'assert'
 import { CID } from 'multiformats/cid'
+import base64 from 'base64-js'
 
 const { encode: linkEncode, decode: linkDecode }: LinkCodec = linkCodecFactory()
 const { encode: blockEncode, decode: blockDecode }: BlockCodec =
@@ -183,7 +184,7 @@ describe('Serde validation with', function () {
                 tags: ['tag2'],
                 timestamp: 123456789,
                 author: 'John Doe',
-                signature: '5623b3e80b85ab83e060bf73f45ea8550db215fc',
+                signature: base64.toByteArray('Y/abSmVYftmvvBuSkVL6S9U8ilvRrSqLJZ7pl2P1qJP/WocJUFXWlZcaiEKMoImH6KNC8I4nrJVP17hUtFM88hg552sp+EBV5V6hOkViHAiZfY6f3hQzaXzozvRlHOGt/UZKKr8lbCYdncASlob/OIsMmbulXKtngnWA48BsUtP7CoKXKKkqmBl/5dvHaAgnZ6voDKssSKlrFUcrd6qOgPUN+aBSv/9DqBTNhOT+JF3MJ3HRGplt648DatCA/eLyXOJZTRtVeVbRO+bqEaLztZ+L/4X4NQoJ1kL7QmwSPAx8qDBJSVBiDtoLG5yjf+u2dILaFjgEBskwtPIJ1ETM4Q=='),
             },
         }
 

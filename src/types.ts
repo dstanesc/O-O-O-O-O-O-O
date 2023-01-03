@@ -125,7 +125,7 @@ type VersionDetails = {
     comment?: Comment
     tags?: Tag[]
     author?: string
-    signature?: any
+    signature?: Uint8Array
     timestamp: number
 }
 

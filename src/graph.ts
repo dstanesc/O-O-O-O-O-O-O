@@ -30,6 +30,7 @@ import { OFFSET_INCREMENTS } from './serde'
 import { TraversalVisitor, traverseVertices } from './depth-first'
 import { IndexStore } from './index-store'
 import { PropPredicate } from './navigate'
+import { Signer } from './trust'
 
 interface ElementAccessor {
     getVertex: (ref: VertexRef) => Promise<Vertex>
@@ -851,9 +852,11 @@ class Tx implements ElementAccessor {
     async commit({
         comment,
         tags,
+        signer
     }: {
         comment?: Comment
         tags?: Tag[]
+        signer?: Signer
     }): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
         const verticesNew = new Map([
             ...this.graph.vertices,
@@ -907,6 +910,11 @@ class Tx implements ElementAccessor {
             timestamp: Date.now(),
         }
 
+        if(signer !== undefined) {
+            const signature = await signer.sign(root)
+            versionDetails.signature = signature
+        }
+       
         const version: Version = {
             root,
             parent: rootBefore.root,

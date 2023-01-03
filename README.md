@@ -325,6 +325,49 @@ for await (const result of navigateVertices(graph, [0], request)) {
 }
 ```
 
+## Cryptographic Trust
+
+Ability to certify the authenticity of the data associated with a particular version by signing the graph root. 
+
+```ts
+/**
+ * Generate a key pair, in practice this would be done once and persisted
+ */
+const { publicKey, privateKey } = await subtle.generateKey(
+    {
+        name: 'RSA-PSS',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256',
+    },
+    true,
+    ['sign', 'verify']
+)
+
+/**
+ * Sign the root while committing
+ */
+const signer: Signer = signerFactory({ subtle, privateKey })
+
+const { root } = await tx.commit({
+    comment: 'First draft',
+    tags: ['v0.0.1'],
+    signer,
+})
+
+/**
+ * Verify the root before reading / querying
+ */
+const { version } = await versionStore.versionGet()
+const trusted = await verify({
+    subtle,
+    publicKey,
+    root: version.root,
+    signature: version.details.signature,
+})
+assert.strictEqual(trusted, true)
+```
+
 ## Multiple block stores
 
 -   [IndexedDB](https://www.npmjs.com/package/@dstanesc/idb-block-store) for browser local
