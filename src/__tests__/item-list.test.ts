@@ -17,6 +17,7 @@ import {
     ItemListTransaction,
     ItemRef,
     ItemValue,
+    readonlyItemList,
 } from '../item-list'
 import { ElemType, ExtRef } from '../types'
 
@@ -365,7 +366,7 @@ describe('Minimal item list', function () {
 
             console.log('extRef', extRef)
 
-            assert.strictEqual( 
+            assert.strictEqual(
                 'bafkreie2iaqxhv56xdtqyih57txqllfwswu7ixhgbnkmfts5weybfuodgu',
                 extRef.extRoot
             )
@@ -378,26 +379,14 @@ describe('Minimal item list', function () {
 
             const { extRoot, elemOffset } = extRef
 
-            const extVersionStore = await versionStoreFactory({
-                readOnly: true,
-                versionRoot: linkCodec.parseString(extRoot),
+            const extItemList: ItemList = await readonlyItemList({
+                extRoot: linkCodec.parseString(extRoot),
                 chunk,
                 linkCodec,
                 valueCodec,
                 blockStore,
             })
 
-            const extGraphStore = graphStoreFactory({
-                chunk,
-                linkCodec,
-                valueCodec,
-                blockStore,
-            })
-
-            const extItemList: ItemList = itemListFactory(
-                extVersionStore,
-                extGraphStore
-            )
             const extItem = await extItemList.get(elemOffset)
 
             enum ExtKeyTypes {

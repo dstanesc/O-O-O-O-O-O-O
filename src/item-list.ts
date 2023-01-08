@@ -1,5 +1,7 @@
+import { BlockStore } from './block-store'
+import { LinkCodec, ValueCodec } from './codecs'
 import { Graph, Tx } from './graph'
-import { GraphStore } from './graph-store'
+import { GraphStore, graphStoreFactory } from './graph-store'
 import { OFFSET_INCREMENTS } from './serde'
 import {
     Version,
@@ -13,8 +15,9 @@ import {
     Block,
     Tag,
     Comment,
+    ExtRef,
 } from './types'
-import { VersionStore } from './version-store'
+import { VersionStore, versionStoreFactory } from './version-store'
 
 interface ItemList {
     tx: () => ItemListTransaction
@@ -54,9 +57,15 @@ const itemListFactory = (
         }
         return { ref, value }
     }
-    const range = async (startIndex: number, itemCount: number): Promise<Item[]> => {
+    const range = async (
+        startIndex: number,
+        itemCount: number
+    ): Promise<Item[]> => {
         const items: Item[] = []
-        const vertices: Vertex[] = await graph.getVertexRange( startIndex * OFFSET_INCREMENTS.VERTEX_INCREMENT, itemCount)
+        const vertices: Vertex[] = await graph.getVertexRange(
+            startIndex * OFFSET_INCREMENTS.VERTEX_INCREMENT,
+            itemCount
+        )
         let index = startIndex
         for (const vertex of vertices) {
             const props: Prop[] = await graph.getVertexProps(vertex)
@@ -125,6 +134,40 @@ class ItemListTransaction {
     }
 }
 
+const readonlyItemList = async ({
+    extRoot,
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+}: {
+    extRoot: Link
+    chunk: (buffer: Uint8Array) => Uint32Array
+    linkCodec: LinkCodec
+    valueCodec: ValueCodec
+    blockStore: BlockStore
+}): Promise<ItemList> => {
+    const readonlyVersionStore = await versionStoreFactory({
+        readOnly: true,
+        versionRoot: extRoot,
+        chunk,
+        linkCodec,
+        valueCodec,
+        blockStore,
+    })
+    const readonlyGraphStore = graphStoreFactory({
+        chunk,
+        linkCodec,
+        valueCodec,
+        blockStore,
+    })
+    const readonlyItemList: ItemList = itemListFactory(
+        readonlyVersionStore,
+        readonlyGraphStore
+    )
+    return readonlyItemList
+}
+
 export {
     ItemList,
     ItemValue,
@@ -132,4 +175,5 @@ export {
     Item,
     ItemListTransaction,
     itemListFactory,
+    readonlyItemList,
 }
