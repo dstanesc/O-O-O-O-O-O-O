@@ -58,6 +58,18 @@ type ValueRef = {
     length: number
 }
 
+enum ElemType {
+    VERTEX = 0x0,
+    EDGE = 0x1,
+    PROP = 0x2,
+}
+
+type ExtRef = {
+    extRoot: string
+    elemType: ElemType
+    elemOffset: Offset
+}
+
 type Type = number & {}
 
 type VertexType = Type & {}
@@ -152,6 +164,8 @@ export {
     PropRef,
     IndexRef,
     ValueRef,
+    ElemType,
+    ExtRef,
     Status,
     Type,
     VertexType,

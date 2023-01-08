@@ -4,7 +4,7 @@ import {
     ValueCodec,
     valueCodecFactory,
 } from '../codecs'
-import { graphStore } from '../graph-store'
+import { graphStoreFactory } from '../graph-store'
 import { compute_chunks } from '@dstanesc/wasm-chunking-fastcdc-node'
 import { chunkerFactory } from '../chunking'
 import { BlockStore, memoryBlockStoreFactory } from '../block-store'
@@ -15,8 +15,10 @@ import {
     ItemList,
     itemListFactory,
     ItemListTransaction,
+    ItemRef,
     ItemValue,
 } from '../item-list'
+import { ElemType, ExtRef } from '../types'
 
 describe('Minimal item list', function () {
     test('internal api, creation and retrieval by index', async () => {
@@ -30,7 +32,12 @@ describe('Minimal item list', function () {
             valueCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+        const graphStore = graphStoreFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+        })
 
         /**
          * Create an item list
@@ -38,7 +45,7 @@ describe('Minimal item list', function () {
         enum KeyTypes {
             NAME = 1,
         }
-        const itemList: ItemList = itemListFactory(versionStore, store)
+        const itemList: ItemList = itemListFactory(versionStore, graphStore)
         const tx = itemList.tx()
         await tx.start()
         await tx.push(new Map([[KeyTypes.NAME, 'item 0']]))
@@ -107,7 +114,7 @@ describe('Minimal item list', function () {
         /**
          * Rehydrate the item list from original version store
          */
-        const itemList2: ItemList = itemListFactory(versionStore, store)
+        const itemList2: ItemList = itemListFactory(versionStore, graphStore)
 
         const len3 = await itemList2.length()
         assert.strictEqual(6, len3)
@@ -135,7 +142,7 @@ describe('Minimal item list', function () {
             valueCodec,
             blockStore,
         })
-        const itemList3: ItemList = itemListFactory(versionStore2, store)
+        const itemList3: ItemList = itemListFactory(versionStore2, graphStore)
 
         const len4 = await itemList3.length()
         assert.strictEqual(6, len4)
@@ -163,7 +170,7 @@ describe('Minimal item list', function () {
          */
         versionStore.checkout(root)
 
-        const itemList5 = itemListFactory(versionStore, store)
+        const itemList5 = itemListFactory(versionStore, graphStore)
         const len5 = await itemList5.length()
         assert.strictEqual(3, len5)
 
@@ -188,7 +195,12 @@ describe('Minimal item list', function () {
             valueCodec,
             blockStore,
         })
-        const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+        const graphStore = graphStoreFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+        })
 
         /**
          * Create an item list
@@ -197,7 +209,7 @@ describe('Minimal item list', function () {
             ID = 11,
             NAME = 33,
         }
-        const itemList: ItemList = itemListFactory(versionStore, store)
+        const itemList: ItemList = itemListFactory(versionStore, graphStore)
         const tx = itemList.tx()
         await tx.start()
         for (let i = 0; i < 100; i++) {
@@ -224,6 +236,175 @@ describe('Minimal item list', function () {
                 `item ${i + 25}`,
                 range[i].value.get(KeyTypes.NAME)
             )
+        }
+    })
+
+    test('internal api, retrieve external refs, extrefx', async () => {
+        const { chunk } = chunkerFactory(512, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockStore: BlockStore = memoryBlockStoreFactory()
+        {
+            /**
+             * Create the original item list containing the item to be referenced
+             */
+            const versionStore: VersionStore = await versionStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+            const graphStore = graphStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+
+            enum KeyTypes {
+                NAME = 1,
+            }
+            const itemList: ItemList = itemListFactory(versionStore, graphStore)
+            const tx = itemList.tx()
+            await tx.start()
+
+            const { index: item0Index, offset: item0Offset }: ItemRef =
+                await tx.push(new Map([[KeyTypes.NAME, 'item 0']]))
+            const itemRef1: ItemRef = await tx.push(
+                new Map([[KeyTypes.NAME, 'item 1']])
+            )
+            const itemRef2: ItemRef = await tx.push(
+                new Map([[KeyTypes.NAME, 'item 2']])
+            )
+
+            const { root, index, blocks } = await tx.commit({
+                comment: 'First commit',
+                tags: ['v0.0.1'],
+            })
+
+            console.log('original root', root.toString())
+        }
+
+        {
+            /**
+             * Create second item list to reference an item from the first item list
+             */
+            const versionStore: VersionStore = await versionStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+            const graphStore = graphStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+
+            enum KeyTypes {
+                ID = 11,
+                NAME = 33,
+                EXT_REF = 55,
+            }
+
+            const itemList: ItemList = itemListFactory(versionStore, graphStore)
+            const tx = itemList.tx()
+            await tx.start()
+            for (let i = 0; i < 100; i++) {
+                const itemValue: ItemValue = new Map<number, any>()
+                const elemOffset = i % 3 // for lists the logical offset seems better than the physical offset
+                const extRef: ExtRef = {
+                    extRoot:
+                        'bafkreie2iaqxhv56xdtqyih57txqllfwswu7ixhgbnkmfts5weybfuodgu',
+                    elemType: ElemType.VERTEX,
+                    elemOffset,
+                }
+                itemValue.set(KeyTypes.ID, i)
+                itemValue.set(KeyTypes.NAME, `item ${i}`)
+                itemValue.set(KeyTypes.EXT_REF, extRef)
+                await tx.push(itemValue)
+            }
+
+            const { root, index, blocks } = await tx.commit({
+                comment: 'First commit',
+                tags: ['v0.0.1'],
+            })
+            console.log('second root', root.toString())
+        }
+        {
+            /**
+             * Browse second item list, incl resolving external refs
+             */
+            enum KeyTypes {
+                ID = 11,
+                NAME = 33,
+                EXT_REF = 55,
+            }
+            const versionRoot = linkCodec.parseString(
+                'bafkreiawv6ftq2ggoepfhqsiywo26rlkpjcjyqwz7gqnywoy4sa3y2lx6q'
+            )
+            const versionStore = await versionStoreFactory({
+                readOnly: true,
+                versionRoot,
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+            const graphStore = graphStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+
+            const itemList: ItemList = itemListFactory(versionStore, graphStore)
+            const item31 = await itemList.get(31)
+            const extRef: ExtRef = item31.value.get(KeyTypes.EXT_REF)
+
+            console.log('extRef', extRef)
+
+            assert.strictEqual( 
+                'bafkreie2iaqxhv56xdtqyih57txqllfwswu7ixhgbnkmfts5weybfuodgu',
+                extRef.extRoot
+            )
+            assert.strictEqual(ElemType.VERTEX, extRef.elemType)
+            assert.strictEqual(1, extRef.elemOffset)
+
+            /**
+             * Resolve external ref
+             */
+
+            const { extRoot, elemOffset } = extRef
+
+            const extVersionStore = await versionStoreFactory({
+                readOnly: true,
+                versionRoot: linkCodec.parseString(extRoot),
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+
+            const extGraphStore = graphStoreFactory({
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore,
+            })
+
+            const extItemList: ItemList = itemListFactory(
+                extVersionStore,
+                extGraphStore
+            )
+            const extItem = await extItemList.get(elemOffset)
+
+            enum ExtKeyTypes {
+                NAME = 1,
+            }
+
+            assert.strictEqual('item 1', extItem.value.get(ExtKeyTypes.NAME))
         }
     })
 })
