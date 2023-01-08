@@ -240,7 +240,7 @@ describe('Minimal item list', function () {
         }
     })
 
-    test('internal api, retrieve external refs, extrefx', async () => {
+    test('internal api, readonlyItemList to retrieve external refs', async () => {
         const { chunk } = chunkerFactory(512, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
@@ -380,7 +380,7 @@ describe('Minimal item list', function () {
             const { extRoot, elemOffset } = extRef
 
             const extItemList: ItemList = await readonlyItemList({
-                extRoot: linkCodec.parseString(extRoot),
+                versionRoot: linkCodec.parseString(extRoot),
                 chunk,
                 linkCodec,
                 valueCodec,

@@ -135,13 +135,13 @@ class ItemListTransaction {
 }
 
 const readonlyItemList = async ({
-    extRoot,
+    versionRoot,
     chunk,
     linkCodec,
     valueCodec,
     blockStore,
 }: {
-    extRoot: Link
+    versionRoot: Link
     chunk: (buffer: Uint8Array) => Uint32Array
     linkCodec: LinkCodec
     valueCodec: ValueCodec
@@ -149,7 +149,7 @@ const readonlyItemList = async ({
 }): Promise<ItemList> => {
     const readonlyVersionStore = await versionStoreFactory({
         readOnly: true,
-        versionRoot: extRoot,
+        versionRoot,
         chunk,
         linkCodec,
         valueCodec,
