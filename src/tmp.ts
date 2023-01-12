@@ -25,6 +25,9 @@ import { eq } from './ops'
 import { Link, VertexRef } from './types'
 import { VersionStore, versionStoreFactory } from './version-store'
 
+import AWS, { S3 } from 'aws-sdk'
+import { blockStore as awsBlockStore } from '@dstanesc/s3-block-store'
+
 const getStream = bent('https://raw.githubusercontent.com')
 
 enum ObjectTypes {
@@ -67,6 +70,11 @@ async function publish() {
     const cache = {}
     const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
     const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
+    // const awsRegion = process.env.AWS_REGION
+    // const awsBucket = process.env.AWS_BUCKET_NAME
+    // AWS.config.update({region: awsRegion})
+    // const s3: S3 = new AWS.S3()
+    // const blockStore: BlockStore = awsBlockStore({ cache, s3, bucket: awsBucket })
     const versionStore: VersionStore = await versionStoreFactory({
         chunk,
         linkCodec,
@@ -136,9 +144,16 @@ async function query() {
     const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
     const linkCodec: LinkCodec = linkCodecFactory()
     const valueCodec: ValueCodec = valueCodecFactory()
-    const resolver = (cid: any) =>
-        `http://192.168.1.205:8080/ipfs/${cid.toString()}`
-    const blockStore = httpBlockStore({ cache, resolver })
+    // const resolver = (cid: any) =>
+    //     `http://192.168.1.205:8080/ipfs/${cid.toString()}`
+    // const blockStore = httpBlockStore({ cache, resolver })
+    // const awsRegion = process.env.AWS_REGION
+    // const awsBucket = process.env.AWS_BUCKET_NAME
+    // AWS.config.update({region: awsRegion})
+    // const s3: S3 = new AWS.S3()
+    // const blockStore: BlockStore = awsBlockStore({ cache, s3, bucket: awsBucket })
+    const ipfs = ipfsApi({ url: process.env.IPFS_API }) // eg. /ip4/192.168.1.231/tcp/5001
+    const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
     const versionRoot = linkCodec.parseString(
         'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
     )
@@ -202,4 +217,5 @@ async function queryVerse(
     return { result: vr[0].value, time }
 }
 
+//await publish()
 await query()

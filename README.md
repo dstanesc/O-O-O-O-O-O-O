@@ -2,10 +2,6 @@
 
 ![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Neo4j inspired index-free adjacency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
 
-## Demo
-
-Graph navigation using IPFS [Hello World](https://github.com/dstanesc/O-O-O-O-O-O-O-H)
-
 ## List
 
 _WIP_
