@@ -1,67 +1,74 @@
 # O-O-O-O-O-O-O
 
-![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Neo4j inspired index-free adjacency. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
+![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
 
-## List
+# Storage Format
 
-_WIP_
+Neo4j inspired index-free adjacency. Vertices, edges and properties are stored in distinct, single category, byte arrays. The records are having _fixed size_. The records are identified by their offset in the byte array. References are merely pointers to byte array offsets. The (property) values are stored as _variable size_ records in a dedicated byte array. The (property) value records are identified and referenced by their offset and the corresponding byte length in the byte array. Both vertices and edges can have properties.
 
-A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
+![](./img/storage-topology.png)
 
-```ts
-enum KeyTypes {
-    ID = 11,
-    NAME = 33,
-}
-const { chunk } = chunkerFactory(512, compute_chunks)
-const linkCodec: LinkCodec = linkCodecFactory()
-const valueCodec: ValueCodec = valueCodecFactory()
-const blockStore: BlockStore = memoryBlockStoreFactory()
-const versionStore: VersionStore = await versionStoreFactory({
-    chunk,
-    linkCodec,
-    valueCodec,
-    blockStore,
-})
-const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-const itemList: ItemList = itemListFactory(versionStore, store)
-const tx = itemList.tx()
-await tx.start()
-for (let i = 0; i < 100; i++) {
-    const itemValue: ItemValue = new Map<number, any>()
-    itemValue.set(KeyTypes.ID, i)
-    itemValue.set(KeyTypes.NAME, `item ${i}`)
-    await tx.push(itemValue)
-}
-const { root, index, blocks } = await tx.commit({
-    comment: 'First commit',
-    tags: ['v0.0.1'],
-})
-// root: bafkreieiuo4jtrhchzswsoromg5w5q4jv734bpt2xb37nlfwsc2usqipre
-```
+# Vertex Binary Format
 
-The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
+Vertices are stored as fixed size records of 25 bytes. First 4 bytes represent the vertex identity and corresponds to the offset in the byte array storage. The next 5 bytes describe the vertex type. First byte of the 5 byte sequence is a marker for existence of the type specification. Can store additional flags in the future. The next 5 bytes represent a reference to the first edge in the edge list associated with the vertex. The next 5 bytes represent a reference to the first property in the property list associated with the vertex. Last byte describes the record status, such `created`, `modified` or `deleted`.
 
-```ts
-const len = await itemList.length()
-assert.strictEqual(100, len)
-const item0 = await itemList.get(0)
-assert.strictEqual('item 0', item0.value.get(KeyTypes.NAME))
-```
+![](./img/vertex-binary-format.png)
 
-Range access is performed w/ sequential reads at byte array level.
+# Edge Binary Format
+
+Edges are stored in a doubly-linked list as fixed size records of 32 bytes. First 4 bytes represent the edge identity and corresponds to the offset in the byte array storage. The next 5 bytes describe the edge type. The next 5 bytes represent a reference to the source vertex. The next 5 bytes represent a reference to the target vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the target vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the target vertex.  The next 5 bytes represent a reference to the first property in the property list associated with the edge. Last byte describes the record status, such `created`, `modified` or `deleted`.
+
+![](./img/edge-binary-format.png)
+
+# Property Binary Format
+
+Properties are stored as fixed size records of 32 bytes. First 4 bytes represent the property identity and corresponds to the offset in the byte array storage. The next 5 bytes describe the property type. The next 4 bytes are the property key. The next 5 bytes are the offset of the property value in the property value byte array. The next 4 bytes represent the byte length of the property value. The next 5 bytes represent a reference to the next property in a given property list. Last byte describes the record status, such `created`, `modified` or `deleted`.
+
+![](./img/prop-binary-format.png)
+
+# Byte Array Chunking
+
+Network transfer efficiency is reached by partitioning the large byte arrays associated with vertices, edges, properties and property values into smaller chunks. It is also imperative that the chunking algorithm remains stable, which is generates identical chunks for contiguous unchanged data. At this stage, the graph library employs content-defined chunking for all underlying byte arrays, more specifically the [FastCDC algorithm](https://github.com/nlfiedler/fastcdc-rs). 
+
+![](./img/byte-array-chunking.png)
+
+Each chunk is identified by its content-identifier (CID). The CID is a cryptographic hash (such SHA-256) of the chunk content. The chunk information is organized in a cid-by-offset search index so that data associated with ranges in the byte array can be accessed extremely efficient - O(1). The records have a fixed size of 40 bytes. The first 4 bytes represent the relative chunk offset in the byte array. The next 36 bytes are the CID:
+
+![](./img/chunk-index-record.png)
+
+The index header stores the index length as well as the byte array length:
+
+![](./img/chunk-index.png)
+
+Any byte array record can be accessed or modified using the index handle (the CID of the index), the record absolute offset and record size. A [generic library](https://github.com/dstanesc/store-chunky-bytes) is used for the above described content-addressable persistence.
+
+
+# Storage Providers
+
+The library can store the data across many technologies or providers. The API is fundamentally a key-value store. The key is the content-identifier (CID) of the chunk and the value is the actual byte array fragment associated with the chunk:
 
 ```ts
-const range: Item[] = await itemList.range(25, 50) // start index, count
-assert.strictEqual(50, range.length)
-for (let i = 0; i < range.length; i++) {
-    assert.strictEqual(`item ${i + 25}`, range[i].value.get(KeyTypes.NAME))
+interface BlockStore {
+    put: (block: { cid: any; bytes: Uint8Array }) => Promise<void>
+    get: (cid: any) => Promise<Uint8Array>
 }
 ```
 
-## Graph
+Few examples of the storage providers:
 
-Authoring data graphs. Providing a `proto-schema` is optional. Below creating, updating in parallel and merging changes on a graph structure mimicking a file system:
+-   [IndexedDB](https://www.npmjs.com/package/@dstanesc/idb-block-store) for browser local
+-   [Azure](https://www.npmjs.com/package/@dstanesc/az-block-store)
+-   [S3](https://www.npmjs.com/package/@dstanesc/s3-block-store)
+-   [IPFS](https://www.npmjs.com/package/@dstanesc/ipfs-block-store)
+-   [IPFS over HTTP](https://www.npmjs.com/package/@dstanesc/http-block-store)
+-   [Lucy](https://www.npmjs.com/package/@dstanesc/lucy-block-store) to store blocks everywhere
+
+
+# Graphs
+
+## Authoring 
+
+Providing a `proto-schema` is optional. Below creating, updating in parallel and merging changes on a graph structure mimicking a file system:
 
 ```ts
 /**
@@ -135,7 +142,11 @@ const { root: original } = await tx.commit({
     comment: 'First draft',
     tags: ['v0.0.1'],
 })
+```
 
+## Revising
+
+```ts
 /**
  * Revise original, first user
  */
@@ -195,6 +206,12 @@ const { root: second } = await tx2.commit({
     comment: 'Revised by second user',
 })
 
+```
+
+## Merging changes
+
+
+```ts
 /**
  * Merge MultiValueRegistry
  */
@@ -257,7 +274,9 @@ assert.strictEqual(mergedFilesLww[1].value, 'nested-file')
 assert.strictEqual(mergedFilesLww[2].value, 'nested-file-user-1')
 ```
 
-Navigate the graph, filter the data and extract vertex, edge or property information
+## Navigate 
+
+Filter the data and extract vertex, edge or property information
 
 ```ts
 const query = async (versionRoot: Link): Promise<Prop[]> => {
@@ -286,8 +305,6 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
     return vr
 }
 ```
-
-_WIP_
 
 ... or extract coarser data fragments using data templates. Proto-language / syntax still under evaluation, hinting towards GraphQL.
 
@@ -321,7 +338,62 @@ for await (const result of navigateVertices(graph, [0], request)) {
 }
 ```
 
-## Cryptographic Trust
+# Lists
+
+Similar to graphs, the library can author, revise, merge and navigate lists. A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
+
+```ts
+enum KeyTypes {
+    ID = 11,
+    NAME = 33,
+}
+const { chunk } = chunkerFactory(512, compute_chunks)
+const linkCodec: LinkCodec = linkCodecFactory()
+const valueCodec: ValueCodec = valueCodecFactory()
+const blockStore: BlockStore = memoryBlockStoreFactory()
+const versionStore: VersionStore = await versionStoreFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+})
+const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const itemList: ItemList = itemListFactory(versionStore, store)
+const tx = itemList.tx()
+await tx.start()
+for (let i = 0; i < 100; i++) {
+    const itemValue: ItemValue = new Map<number, any>()
+    itemValue.set(KeyTypes.ID, i)
+    itemValue.set(KeyTypes.NAME, `item ${i}`)
+    await tx.push(itemValue)
+}
+const { root, index, blocks } = await tx.commit({
+    comment: 'First commit',
+    tags: ['v0.0.1'],
+})
+// root: bafkreieiuo4jtrhchzswsoromg5w5q4jv734bpt2xb37nlfwsc2usqipre
+```
+
+The technology is suitable for very large lists. As vertex records have a fixed size, item access by index is translated into access by offset, therefore constant - O(1). Retrieving the length of the list is also constant - O(1).
+
+```ts
+const len = await itemList.length()
+assert.strictEqual(100, len)
+const item0 = await itemList.get(0)
+assert.strictEqual('item 0', item0.value.get(KeyTypes.NAME))
+```
+
+Range access is performed w/ sequential reads at byte array level.
+
+```ts
+const range: Item[] = await itemList.range(25, 50) // start index, count
+assert.strictEqual(50, range.length)
+for (let i = 0; i < range.length; i++) {
+    assert.strictEqual(`item ${i + 25}`, range[i].value.get(KeyTypes.NAME))
+}
+```
+
+# Cryptographic Trust
 
 Ability to certify the authenticity of the data associated with a particular version by signing the graph root. 
 
@@ -364,25 +436,7 @@ const trusted = await verify({
 assert.strictEqual(trusted, true)
 ```
 
-## Multiple block stores
-
--   [IndexedDB](https://www.npmjs.com/package/@dstanesc/idb-block-store) for browser local
--   [Azure](https://www.npmjs.com/package/@dstanesc/az-block-store)
--   [S3](https://www.npmjs.com/package/@dstanesc/s3-block-store)
--   [IPFS](https://www.npmjs.com/package/@dstanesc/ipfs-block-store)
--   [IPFS over HTTP](https://www.npmjs.com/package/@dstanesc/http-block-store)
--   [Lucy](https://www.npmjs.com/package/@dstanesc/lucy-block-store) to store blocks everywhere
-
-or provide your own
-
-```ts
-interface BlockStore {
-    put: (block: { cid: any; bytes: Uint8Array }) => Promise<void>
-    get: (cid: any) => Promise<Uint8Array>
-}
-```
-
-## Multiple APIs
+# Multiple APIs
 
 _WIP_
 
