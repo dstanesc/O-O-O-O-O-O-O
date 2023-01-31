@@ -32,7 +32,7 @@ Network transfer efficiency is reached by partitioning the large byte arrays ass
 
 ![](./img/byte-array-chunking.png)
 
-Each chunk is identified by its content-identifier (CID). The CID is a cryptographic hash (such SHA-256) of the chunk content. The chunk information is organized in a cid-by-offset search index so that data associated with ranges in the byte array can be accessed extremely efficient - O(1). The records have a fixed size of 40 bytes. The first 4 bytes represent the relative chunk offset in the byte array. The next 36 bytes are the CID:
+Each chunk is identified by its content-identifier (CID). The CID is a cryptographic hash (such SHA-256) of the chunk content. The chunk information is organized in a cid-by-offset search index so that data associated with ranges in the byte array can be accessed extremely efficient - O(1). The records have a fixed size of 40 bytes. The first 4 bytes represent the relative chunk offset in the logical byte array. The next 36 bytes are the CID:
 
 ![](./img/chunk-index-record.png)
 
@@ -40,7 +40,7 @@ The index header stores the index length as well as the byte array length:
 
 ![](./img/chunk-index.png)
 
-Any byte array record can be accessed or modified using the index handle (the CID of the index), the record absolute offset and record size. A [generic library](https://github.com/dstanesc/store-chunky-bytes) is used for the above described content-addressable persistence.
+Any byte array record can be accessed or modified using the index handle (the CID of the index), the record absolute offset and record size. An externalized [generic library](https://github.com/dstanesc/store-chunky-bytes) is used for logical byte array editing.
 
 
 # Storage Providers
