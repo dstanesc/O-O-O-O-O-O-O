@@ -16,7 +16,7 @@ Vertices are stored as fixed size records of 25 bytes. First 4 bytes represent t
 
 # Edge Binary Format
 
-Edges are stored in a doubly-linked list as fixed size records of 32 bytes. First 4 bytes represent the edge identity and corresponds to the offset in the byte array storage. The next 5 bytes describe the edge type. The next 5 bytes represent a reference to the source vertex. The next 5 bytes represent a reference to the target vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the target vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the target vertex.  The next 5 bytes represent a reference to the first property in the property list associated with the edge. Last byte describes the record status, such `created`, `modified` or `deleted`.
+Edges are stored in a double-linked list as fixed size records of 32 bytes. First 4 bytes represent the edge identity and corresponds to the offset in the byte array storage. The next 5 bytes describe the edge type. The next 5 bytes represent a reference to the source vertex. The next 5 bytes represent a reference to the target vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the source vertex. The next 5 bytes represent a reference to the previous edge in the edge list associated with the target vertex. The next 5 bytes represent a reference to the next edge in the edge list associated with the target vertex. The next 5 bytes represent a reference to the first property in the property list associated with the edge. Last byte describes the record status, such `created`, `modified` or `deleted`.
 
 ![](./img/edge-binary-format.png)
 
@@ -28,7 +28,7 @@ Properties are stored as fixed size records of 32 bytes. First 4 bytes represent
 
 # Byte Array Chunking
 
-Network transfer efficiency is reached by partitioning the large byte arrays associated with vertices, edges, properties and property values into smaller chunks. It is also imperative that the chunking algorithm remains stable, which is generates identical chunks for contiguous unchanged data. At this stage, the graph library employs content-defined chunking for all underlying byte arrays, more specifically the [FastCDC algorithm](https://github.com/nlfiedler/fastcdc-rs). 
+Network transfer efficiency is reached by partitioning the large byte arrays associated with vertices, edges, properties and property values into smaller chunks. It is also imperative that the chunking algorithm remains stable, which is generates identical chunks for contiguous unchanged data. At this stage, the graph library employs content-defined chunking for all underlying byte arrays, more specifically the [FastCDC algorithm](https://github.com/nlfiedler/fastcdc-rs).
 
 ![](./img/byte-array-chunking.png)
 
@@ -41,7 +41,6 @@ The index header stores the index length as well as the byte array length:
 ![](./img/chunk-index.png)
 
 Any byte array record can be accessed or modified using the index handle (the CID of the index), the record absolute offset and record size. An externalized [generic library](https://github.com/dstanesc/store-chunky-bytes) is used for logical byte array editing.
-
 
 # Storage Providers
 
@@ -63,10 +62,9 @@ Few examples of the storage providers:
 -   [IPFS over HTTP](https://www.npmjs.com/package/@dstanesc/http-block-store)
 -   [Lucy](https://www.npmjs.com/package/@dstanesc/lucy-block-store) to store blocks everywhere
 
-
 # Graphs
 
-## Authoring 
+## Authoring
 
 Providing a `proto-schema` is optional. Below creating, updating in parallel and merging changes on a graph structure mimicking a file system:
 
@@ -104,7 +102,12 @@ const versionStore: VersionStore = await versionStoreFactory({
     valueCodec,
     blockStore,
 })
-const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const graphStore = graphStoreFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+})
 
 /**
  * Build original data set
@@ -151,7 +154,12 @@ const { root: original } = await tx.commit({
  * Revise original, first user
  */
 
-const graphStore1 = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const graphStore1 = graphStoreFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+})
 const g1 = new Graph(versionStore, graphStore1)
 
 const tx1 = g1.tx()
@@ -181,7 +189,12 @@ const { root: first } = await tx1.commit({
  */
 versionStore.checkout(original)
 
-const graphStore2 = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const graphStore2 = graphStoreFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+})
 const g2 = new Graph(versionStore, graphStore2)
 
 const tx2 = g2.tx()
@@ -205,11 +218,9 @@ await tx2.addVertexProp(
 const { root: second } = await tx2.commit({
     comment: 'Revised by second user',
 })
-
 ```
 
 ## Merging changes
-
 
 ```ts
 /**
@@ -274,7 +285,7 @@ assert.strictEqual(mergedFilesLww[1].value, 'nested-file')
 assert.strictEqual(mergedFilesLww[2].value, 'nested-file-user-1')
 ```
 
-## Navigate 
+## Navigate
 
 Filter the data and extract vertex, edge or property information
 
@@ -287,7 +298,12 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         valueCodec,
         blockStore,
     })
-    const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+    const graphStore = graphStoreFactory({
+        chunk,
+        linkCodec,
+        valueCodec,
+        blockStore,
+    })
     const graph = new Graph(versionStore, graphStore)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)
@@ -357,7 +373,12 @@ const versionStore: VersionStore = await versionStoreFactory({
     valueCodec,
     blockStore,
 })
-const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const graphStore = graphStoreFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+})
 const itemList: ItemList = itemListFactory(versionStore, graphStore)
 const tx = itemList.tx()
 await tx.start()
@@ -395,7 +416,7 @@ for (let i = 0; i < range.length; i++) {
 
 # Cryptographic Trust
 
-Ability to certify the authenticity of the data associated with a particular version by signing the graph root. 
+Ability to certify the authenticity of the data associated with a particular version by signing the graph root.
 
 ```ts
 /**
