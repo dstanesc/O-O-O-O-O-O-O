@@ -104,12 +104,12 @@ const versionStore: VersionStore = await versionStoreFactory({
     valueCodec,
     blockStore,
 })
-const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
+const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
 
 /**
  * Build original data set
  */
-const graph = new Graph(versionStore, store)
+const graph = new Graph(versionStore, graphStore)
 
 const tx = graph.tx()
 
@@ -151,8 +151,8 @@ const { root: original } = await tx.commit({
  * Revise original, first user
  */
 
-const store1 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-const g1 = new Graph(versionStore, store1)
+const graphStore1 = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const g1 = new Graph(versionStore, graphStore1)
 
 const tx1 = g1.tx()
 await tx1.start()
@@ -181,8 +181,8 @@ const { root: first } = await tx1.commit({
  */
 versionStore.checkout(original)
 
-const store2 = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-const g2 = new Graph(versionStore, store2)
+const graphStore2 = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const g2 = new Graph(versionStore, graphStore2)
 
 const tx2 = g2.tx()
 await tx2.start()
@@ -287,8 +287,8 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
         valueCodec,
         blockStore,
     })
-    const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-    const graph = new Graph(versionStore, store)
+    const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+    const graph = new Graph(versionStore, graphStore)
     const request = new RequestBuilder()
         .add(PathElemType.VERTEX)
         .add(PathElemType.EDGE)
@@ -357,8 +357,8 @@ const versionStore: VersionStore = await versionStoreFactory({
     valueCodec,
     blockStore,
 })
-const store = graphStore({ chunk, linkCodec, valueCodec, blockStore })
-const itemList: ItemList = itemListFactory(versionStore, store)
+const graphStore = graphStoreFactory({ chunk, linkCodec, valueCodec, blockStore })
+const itemList: ItemList = itemListFactory(versionStore, graphStore)
 const tx = itemList.tx()
 await tx.start()
 for (let i = 0; i < 100; i++) {
