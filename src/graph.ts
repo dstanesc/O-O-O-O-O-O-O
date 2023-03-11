@@ -938,6 +938,9 @@ class Tx implements ElementAccessor {
             const vertex: Vertex = await this.getVertex(vertexRef)
             if (incomingRefs !== undefined) {
                 const outgoingEdges = edgesOutgoing(vertex, this)
+                // FIXME Poor alg assumes single incoming edge (ie tree struct), elaboration needed ...
+                // Should we to follow Neo4j's RelationshipRecord structure to store
+                // a bool when edge is first in chain (for both - src and target chains) ?
                 for await (const outgoingEdge of outgoingEdges) {
                     for (const incomingEdgeRef of incomingRefs.values()) {
                         const incomingEdge: Edge = await this.getEdge(
