@@ -18,6 +18,7 @@ import {
     Offset,
     ValueRef,
     PropRef,
+    PropRecord,
 } from './types'
 
 const REF_EXISTS = 0x1
@@ -498,6 +499,47 @@ class PropEncoder extends BinaryEncoder {
     }
 }
 
+class PropRecordDecoder extends BinaryDecoder {
+    constructor(buffer: Uint8Array) {
+        super(buffer)
+    }
+    async readPropValueRef(): Promise<ValueRef> {
+        const propRef = this.readOffset()
+        const ref = this.readRef()
+        if (ref !== undefined) {
+            const length = this.readUInt()
+            const valueRef: ValueRef = { propRef, ref, length }
+            return valueRef
+        } else {
+            this.skipUInt()
+            return undefined
+        }
+    }
+    async readProp(): Promise<PropRecord> {
+        const offset = this.readOffset() //4
+        const type = this.readType() //5
+        const key = this.readUInt() //4
+        const valueRef = await this.readPropValueRef() // 13
+        const nextProp = this.readRef() //5
+        const status = this.readStatus() //1
+        const propRecord: PropRecord = { status, offset, key, valueRef }
+        if (type !== undefined) propRecord.type = type
+        if (nextProp !== undefined) propRecord.nextProp = nextProp
+        return propRecord
+    }
+
+    async read(): Promise<PropRecord[]> {
+        if (this.buffer.byteLength % PROP_SIZE_BYTES !== 0)
+            throw new Error('Invalid prop serialization')
+        const size = Math.trunc(this.buffer.byteLength / PROP_SIZE_BYTES)
+        const props = []
+        for (let i = 0; i < size; i++) {
+            props.push(await this.readProp())
+        }
+        return props
+    }
+}
+
 class PropDecoder extends BinaryDecoder {
     valueGet: (ref: ValueRef) => Promise<PropValue>
     constructor(
@@ -888,6 +930,7 @@ export {
     VertexDecoder,
     EdgeEncoder,
     EdgeDecoder,
+    PropRecordDecoder,
     PropEncoder,
     PropDecoder,
     PropValueEncoder,

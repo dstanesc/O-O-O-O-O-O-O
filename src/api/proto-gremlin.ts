@@ -203,7 +203,9 @@ class NavigateVertexWrapper extends NavigateWrapper {
 
     async *navigate(refs: VertexRef[]): AsyncGenerator<any, void, void> {
         if (this.navigation.request === undefined)
-            this.navigation.request = new NavigationThreshold(Number.MAX_SAFE_INTEGER)
+            this.navigation.request = new NavigationThreshold(
+                Number.MAX_SAFE_INTEGER
+            )
         yield* navigateVertices(this.graph, refs, {
             path: this.navigation.path,
             request: this.navigation.request,
@@ -279,7 +281,9 @@ class NavigateEdgeWrapper extends NavigateWrapper {
 
     async *navigate(refs: EdgeRef[]): AsyncGenerator<any, void, void> {
         if (this.navigation.request === undefined)
-            this.navigation.request = new NavigationThreshold(Number.MAX_SAFE_INTEGER)
+            this.navigation.request = new NavigationThreshold(
+                Number.MAX_SAFE_INTEGER
+            )
         yield* navigateEdges(this.graph, refs, {
             path: this.navigation.path,
             request: this.navigation.request,
@@ -476,6 +480,22 @@ class ProtoGremlin {
     // For debug only
     async allProps() {
         return await this.graph.allProps()
+    }
+
+    async pack(versionRoot?: Link): Promise<Block> {
+        return await this.graph.packGraph(versionRoot)
+    }
+
+    async packFragment(
+        vertexOffsetStart: number,
+        vertexCount: number,
+        versionRoot?: Link
+    ): Promise<Block> {
+        return await this.graph.packGraphFragment(
+            vertexOffsetStart,
+            vertexCount,
+            versionRoot
+        )
     }
 }
 

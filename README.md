@@ -220,7 +220,7 @@ const { root: second } = await tx2.commit({
 })
 ```
 
-## Merging changes
+## Merging
 
 ```ts
 /**
@@ -352,6 +352,61 @@ const vr: any[] = []
 for await (const result of navigateVertices(graph, [0], request)) {
     vr.push(result)
 }
+```
+
+## Bundle
+
+Bundles consist of more `Blocks` assembled in a larger `Block`:
+
+```ts
+type Block = {
+    cid: CID
+    bytes: Uint8Array
+}
+```
+
+They can be used to transfer data between systems or to store a complete graph in a single file. As any other `Block` bundles can also be stored in a BlockStore.
+
+```ts
+const g: ProtoGremlin = protoGremlinFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore,
+    versionStore,
+}).g()
+
+/**
+ * Bundle complete graphs into a single block. Restore the bundle into a new block store.
+ */
+const bundle1: Block = await g.pack(versionRoot)
+
+/**
+ * Bundle a section of the graph, derived from a vertex range
+ */
+const bundle2: Block = await g.packFragment(808775, 1, versionRoot)
+
+/**
+ * Bundle single commit
+ */
+const tx = g.tx()
+//...
+const commit = await tx.commit({})
+const { packCommit } = graphPackerFactory(linkCodec)
+const bundle3: Block = await packCommit(commit)
+
+const { unpack, restore } = graphPackerFactory(linkCodec)
+
+/**
+ * Unpack the bundle
+ */
+const { root, index, blocks } = await unpack(bundle.bytes)
+
+/**
+ * Restore the bundle into a new block store
+ */
+const emptyStore: MemoryBlockStore = memoryBlockStoreFactory()
+const { root, index, blocks } = await restore(bundle.bytes, emptyStore)
 ```
 
 # Lists
