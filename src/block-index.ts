@@ -5,7 +5,9 @@ import { LinkCodec } from './codecs'
 import { BlockStore } from './block-store'
 
 interface BlockIndexFactory {
-    buildRootIndex: (root: Link) => Promise<{ root: Link; index: RootIndex }>
+    buildRootIndex: (
+        root: Link
+    ) => Promise<{ root: Link; index: RootIndex; indexBuffer: Uint8Array }>
     buildChunkyIndex: (root: Link) => Promise<{
         indexStruct: {
             startOffsets: Map<number, any>
@@ -42,7 +44,7 @@ const blockIndexFactory = ({
 
     const buildRootIndex = async (
         root: Link
-    ): Promise<{ root: Link; index: RootIndex }> => {
+    ): Promise<{ root: Link; index: RootIndex; indexBuffer: Uint8Array }> => {
         const bytes = await blockGet(root)
         const rootStruct = new RootDecoder(bytes, linkDecode).read()
         const vertexIndex = await buildChunkyIndex(rootStruct.vertexRoot)
@@ -54,7 +56,7 @@ const blockIndexFactory = ({
             { vertexIndex, edgeIndex, propIndex, valueIndex, indexIndex },
             rootStruct
         )
-        return { root, index }
+        return { root, index, indexBuffer: bytes }
     }
 
     return { buildRootIndex, buildChunkyIndex }

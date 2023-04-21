@@ -1,4 +1,5 @@
 interface Part {
+    [x: string]: any
     status: Status
     offset: Offset
     type?: Type
@@ -23,6 +24,12 @@ interface Edge extends Part {
 interface Prop extends Part {
     key: KeyType
     value: PropValue
+    nextProp?: PropRef
+}
+
+interface PropRecord extends Part {
+    key: KeyType
+    valueRef: ValueRef
     nextProp?: PropRef
 }
 
@@ -155,6 +162,7 @@ export {
     Vertex,
     Edge,
     Prop,
+    PropRecord,
     Part,
     Index,
     Offset,

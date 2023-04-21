@@ -1,6 +1,7 @@
 export * from './api/proto-gremlin'
 export * from './block-index'
 export * from './block-store'
+export * from './block-store-staging'
 export * from './chunking'
 export * from './codecs'
 export * from './depth-first'

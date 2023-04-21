@@ -31,6 +31,7 @@ import {
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
 import { BlockStore } from './block-store'
+import { graphPackerFactory } from './graph-packer'
 
 interface GraphStore {
     vertexGet: (
@@ -116,6 +117,12 @@ interface GraphStore {
             }
         }
     ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+    packGraph: (versionRoot: Link) => Promise<Block>
+    packComputed: (
+        versionRoot: Link,
+        vertexOffsetStart: number,
+        vertexCount: number
+    ) => Promise<Block>
 }
 
 const { create, read, append, update, bulk, remove, readIndex } = chunkyStore()
@@ -696,6 +703,27 @@ const graphStore = ({
         return { root: rootAfter, index: indexAfter, blocks }
     }
 
+    const packGraph = async (versionRoot: Link): Promise<Block> => {
+        const { packGraph } = graphPackerFactory(linkCodec)
+        return await packGraph(versionRoot, blockStore)
+    }
+
+    const packComputed = async (
+        versionRoot: Link,
+        vertexOffsetStart: number,
+        vertexCount: number
+    ): Promise<Block> => {
+        const { packComputed } = graphPackerFactory(linkCodec)
+        return packComputed(
+            versionRoot,
+            vertexOffsetStart,
+            vertexCount,
+            blockStore,
+            chunk,
+            valueCodec
+        )
+    }
+
     return {
         commit,
         vertexGet,
@@ -709,6 +737,8 @@ const graphStore = ({
         verticesAll,
         edgesAll,
         propsAll,
+        packGraph,
+        packComputed,
     }
 }
 

@@ -31,6 +31,8 @@ import { TraversalVisitor, traverseVertices } from './depth-first'
 import { IndexStore } from './index-store'
 import { PropPredicate } from './navigate'
 import { Signer } from './trust'
+import { graphPackerFactory } from './graph-packer'
+import { VersionString } from 'aws-sdk/clients/glue'
 
 interface ElementAccessor {
     getVertex: (ref: VertexRef) => Promise<Vertex>
@@ -172,7 +174,12 @@ class Graph implements ElementAccessor {
             indices: { added: Map<number, Index>; updated: Map<number, Index> }
         }
     ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
-
+    packGraph: (versionRoot: Link) => Promise<Block>
+    packComputed: (
+        versionRoot: Link,
+        vertexOffsetStart: number,
+        vertexCount: number
+    ) => Promise<Block>
     indexCreate: (values: IndexedValue[]) => Promise<Link>
     indexSearch: (link: Link, value: any) => Promise<IndexedValue>
 
@@ -203,6 +210,8 @@ class Graph implements ElementAccessor {
             edgesAll,
             propsAll,
             commit,
+            packGraph,
+            packComputed,
         }: {
             vertexGet: (
                 { root, index }: { root: Link; index: RootIndex },
@@ -293,6 +302,12 @@ class Graph implements ElementAccessor {
                     }
                 }
             ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+            packGraph: (versionRoot: Link) => Promise<Block>
+            packComputed: (
+                versionRoot: Link,
+                vertexOffsetStart: number,
+                vertexCount: number
+            ) => Promise<Block>
         },
         { indexCreate, indexSearch }: IndexStore = {
             indexCreate: undefined,
@@ -317,6 +332,8 @@ class Graph implements ElementAccessor {
         this.edgesAll = edgesAll
         this.propsAll = propsAll
         this.commit = commit
+        this.packGraph = packGraph
+        this.packComputed = packComputed
         this.indexCreate = indexCreate
         this.indexSearch = indexSearch
     }
@@ -475,6 +492,22 @@ class Graph implements ElementAccessor {
         return indexedValue
     }
 
+    async getVertexEdges(vertex: Vertex): Promise<Edge[]> {
+        const edges: Edge[] = []
+        if (vertex.nextEdge !== undefined) {
+            await this.getNextEdges(vertex.nextEdge, edges)
+        }
+        return edges
+    }
+
+    async getNextEdges(ref: EdgeRef, edges: Edge[]): Promise<void> {
+        const edge: Edge = await this.getEdge(ref)
+        edges.push(edge)
+        if (edge.nextEdge !== undefined) {
+            await this.getNextEdges(edge.nextEdge, edges)
+        }
+    }
+
     async getVertexProps(vertex: Vertex): Promise<Prop[]> {
         const props: Prop[] = []
         if (vertex.nextProp !== undefined) {
@@ -501,6 +534,25 @@ class Graph implements ElementAccessor {
 
     tx() {
         return new Tx(this)
+    }
+
+    async packGraphVersion(versionRoot?: Link): Promise<Block> {
+        const { root } =
+            versionRoot === undefined
+                ? await this.rootGet()
+                : { root: versionRoot }
+        return await this.packGraph(root)
+    }
+    async packGraphFragment(
+        vertexOffsetStart: number,
+        vertexCount: number,
+        versionRoot?: Link
+    ): Promise<Block> {
+        const { root } =
+            versionRoot === undefined
+                ? await this.rootGet()
+                : { root: versionRoot }
+        return await this.packComputed(root, vertexOffsetStart, vertexCount)
     }
 }
 
@@ -852,7 +904,7 @@ class Tx implements ElementAccessor {
     async commit({
         comment,
         tags,
-        signer
+        signer,
     }: {
         comment?: Comment
         tags?: Tag[]
@@ -910,11 +962,11 @@ class Tx implements ElementAccessor {
             timestamp: Date.now(),
         }
 
-        if(signer !== undefined) {
+        if (signer !== undefined) {
             const signature = await signer.sign(root)
             versionDetails.signature = signature
         }
-       
+
         const version: Version = {
             root,
             parent: rootBefore.root,
