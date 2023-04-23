@@ -322,14 +322,13 @@ for await (const result of navigateVertices(graph, [0], request)) {
 
 ## Bundle
 
-Super important feature for building efficient systems. A bundle is a single large `Block` containing many finer granular `Blocks`. Bundles can be used to optimize data sharing or data transfer. As any other `Block`, bundles can be stored in a BlockStore. See `packer.test.ts` for more examples.
+Super important feature for building efficient systems. A bundle is a single large `Block` containing granular `Blocks`. Bundles can be used to optimize data sharing. As any `Block`, bundles can be stored in a BlockStore. See `packer.test.ts` for more examples.
 
 ```ts
 type Block = {
     cid: any
     bytes: Uint8Array
 }
-
 const g: ProtoGremlin = protoGremlinFactory({
     chunk,
     linkCodec,
@@ -358,11 +357,10 @@ const commit = await tx.commit({})
 const { packCommit } = graphPackerFactory(linkCodec)
 const bundle3: Block = await packCommit(commit)
 
-const { unpack, restore } = graphPackerFactory(linkCodec)
-
 /**
  * Unpack the bundle
  */
+const { unpack, restore } = graphPackerFactory(linkCodec)
 const { root, index, blocks } = await unpack(bundle.bytes)
 
 /**
