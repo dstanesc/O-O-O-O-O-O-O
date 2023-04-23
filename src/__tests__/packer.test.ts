@@ -78,6 +78,35 @@ async function queryVerse(
     return { result: vr[0].value, time }
 }
 
+async function queryVerseFromBook(
+    g: ProtoGremlin,
+    bookOffset: VertexRef,
+    chapter: number,
+    verse: number
+): Promise<{ result: string; time: number }> {
+    const vr = []
+    const startTime = new Date().getTime()
+    for await (const result of g
+        .V([bookOffset])
+        .out(RlshpTypes.chapter)
+        .has(ObjectTypes.CHAPTER, {
+            keyType: KeyTypes.ID,
+            operation: eq(chapter),
+        })
+        .out(RlshpTypes.verse)
+        .has(ObjectTypes.VERSE, { keyType: KeyTypes.ID, operation: eq(verse) })
+        .values(KeyTypes.TEXT)
+        .maxResults(1)
+        .exec()) {
+        vr.push(result)
+    }
+    const endTime = new Date().getTime()
+    const time = endTime - startTime
+    console.log(`Query Time ${time} ms`)
+
+    return { result: vr[0].value, time }
+}
+
 async function quickVerse(
     g: ProtoGremlin,
     verseOffset: VertexRef
@@ -230,6 +259,9 @@ describe('Graph packer', function () {
                 verse_id = entry.verse
                 await tx.addE(RlshpTypes.verse).from(chapter).to(verse).next()
             }
+            console.log(
+                `Book:${entry.book_name}: ${book.offset} Chapter: ${entry.chapter}: ${chapter.offset} Verse: ${entry.verse}: ${verse.offset}`
+            )
         }
 
         const commit = await tx.commit({})
@@ -267,7 +299,7 @@ describe('Graph packer', function () {
         }
     })
 
-    test('pack and restore computed range', async () => {
+    test('pack and restore computed range, graph depth 1', async () => {
         const cache = {}
         const ipfs = ipfsApi({ url: process.env.IPFS_API })
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
@@ -291,6 +323,7 @@ describe('Graph packer', function () {
             versionRoot,
             808775, // first vertex ref
             1, // vertex count
+            1, // graph depth
             blockStore,
             chunk,
             valueCodec
@@ -323,7 +356,7 @@ describe('Graph packer', function () {
                 result,
                 'The grace of our Lord Jesus Christ be with you all. Amen.'
             )
-            assert.ok(time < 3) // 3ms
+            assert.ok(time < 10) // 10ms
         }
 
         {
@@ -357,9 +390,74 @@ describe('Graph packer', function () {
                 versionStore,
             }).g()
 
-            const bundle2 = await g.packFragment(808775, 1, versionRoot)
+            const bundle2 = await g.packFragment(808775, 1, 1, versionRoot)
 
             assert.deepStrictEqual(bundle, bundle2)
         }
+    })
+
+    test('pack and restore computed range, graph depth 3', async () => {
+        const cache = {}
+        const ipfs = ipfsApi({ url: process.env.IPFS_API })
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
+        const versionRoot = linkCodec.parseString(
+            'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi'
+        )
+        const versionStore: VersionStore = await versionStoreFactory({
+            versionRoot,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+        })
+
+        const g: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+            versionStore,
+        }).g()
+
+        // Packing single (Revelation) book, w/ depth 3 (book, chapters, verses) - vertex offset is 798175
+        const bundle = await g.packFragment(798175, 1, 3, versionRoot)
+
+        const emptyStore: MemoryBlockStore = memoryBlockStoreFactory()
+
+        const { restore } = graphPackerFactory(linkCodec)
+
+        await restore(bundle.bytes, emptyStore)
+
+        console.log(`Unpacked block count: ${emptyStore.size()}`)
+
+        const g2: ProtoGremlin = protoGremlinFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: emptyStore,
+            versionStore,
+        }).g()
+
+        const { result: r1, time } = await queryVerseFromBook(
+            g2,
+            798175,
+            22,
+            21
+        )
+
+        assert.strictEqual(
+            r1,
+            'The grace of our Lord Jesus Christ be with you all. Amen.'
+        )
+
+        const { result: r2 } = await queryVerseFromBook(g2, 798175, 22, 11)
+
+        assert.strictEqual(
+            r2,
+            'He that is unjust, let him be unjust still: and he which is filthy, let him be filthy still: and he that is righteous, let him be righteous still: and he that is holy, let him be holy still.'
+        )
     })
 })

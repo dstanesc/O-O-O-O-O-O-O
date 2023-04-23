@@ -4,8 +4,7 @@
 
 # Docs
 
-- [Storage format](./doc/storage-format.md)
-- [Brief overview](./doc/O7.pdf)
+-   [Storage format](./doc/storage-format.md)
 
 # Storage Providers
 
@@ -286,6 +285,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
     return vr
 }
 ```
+
 ## Extract
 
 Extract coarser data fragments using data templates. Proto-language / syntax still under evaluation, hinting towards GraphQL.
@@ -322,18 +322,14 @@ for await (const result of navigateVertices(graph, [0], request)) {
 
 ## Bundle
 
-Bundles consist of multiple `Blocks` assembled in a larger `Block`:
+Super important feature for building efficient systems. A bundle is a single large `Block` containing many finer granular `Blocks`. Bundles can be used to optimize data sharing or data transfer. As any other `Block`, bundles can be stored in a BlockStore. See `packer.test.ts` for more examples.
 
 ```ts
 type Block = {
     cid: any
     bytes: Uint8Array
 }
-```
 
-They can be used to transfer data between systems or to store a complete graph in a single file. As any other `Block` bundles can also be stored in a BlockStore.
-
-```ts
 const g: ProtoGremlin = protoGremlinFactory({
     chunk,
     linkCodec,
@@ -343,14 +339,15 @@ const g: ProtoGremlin = protoGremlinFactory({
 }).g()
 
 /**
- * Bundle complete graphs into a single block. Restore the bundle into a new block store.
+ * Bundle complete graphs into a single block. The graph is identified by version root.
  */
-const bundle1: Block = await g.pack(versionRoot)
+const bundle1: Block = await g.pack(root)
 
 /**
- * Bundle a section of the graph, derived from a vertex range
+ * Bundle a logical section of the graph. The fragment is a collection of sub-graphs.
+ * The fragment is identified by the start vertex, count of vertices from the start vertex and the sub-graph depth.
  */
-const bundle2: Block = await g.packFragment(808775, 1, versionRoot)
+const bundle2: Block = await g.packFragment(798175, 1, 3, root)
 
 /**
  * Bundle single commit
@@ -371,9 +368,22 @@ const { root, index, blocks } = await unpack(bundle.bytes)
 /**
  * Restore the bundle into a new block store
  */
-const emptyStore: MemoryBlockStore = memoryBlockStoreFactory()
-const { root, index, blocks } = await restore(bundle.bytes, emptyStore)
+const remoteStore: MemoryBlockStore = memoryBlockStoreFactory()
+const { root, index, blocks } = await restore(bundle.bytes, remoteStore)
+
+/**
+* Use now the restored bundle for querying
+*/
+const g: ProtoGremlin = protoGremlinFactory({
+    chunk,
+    linkCodec,
+    valueCodec,
+    blockStore: remoteStore,
+    versionStore,
+}).g()
+//...
 ```
+
 
 # Lists
 

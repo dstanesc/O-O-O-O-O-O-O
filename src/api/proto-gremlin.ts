@@ -482,18 +482,34 @@ class ProtoGremlin {
         return await this.graph.allProps()
     }
 
+    /**
+     * Pack a complete graph
+     * @param versionRoot - the version root
+     * @returns - a block containing the packed graph
+     */
     async pack(versionRoot?: Link): Promise<Block> {
         return await this.graph.packGraph(versionRoot)
     }
 
+    /**
+     * Pack a graph fragment
+     * 
+     * @param vertexOffsetStart - the offset of the first vertex
+     * @param vertexCount - the number of vertices, counting from the first vertex
+     * @param graphDepth - the depth of the fragment
+     * @param versionRoot - the version root
+     * @returns - a block containing the packed graph fragment
+     */
     async packFragment(
         vertexOffsetStart: number,
         vertexCount: number,
+        graphDepth: number,
         versionRoot?: Link
     ): Promise<Block> {
         return await this.graph.packGraphFragment(
             vertexOffsetStart,
             vertexCount,
+            graphDepth,
             versionRoot
         )
     }

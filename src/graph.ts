@@ -178,7 +178,8 @@ class Graph implements ElementAccessor {
     packComputed: (
         versionRoot: Link,
         vertexOffsetStart: number,
-        vertexCount: number
+        vertexCount: number,
+        graphDepth: number
     ) => Promise<Block>
     indexCreate: (values: IndexedValue[]) => Promise<Link>
     indexSearch: (link: Link, value: any) => Promise<IndexedValue>
@@ -306,7 +307,8 @@ class Graph implements ElementAccessor {
             packComputed: (
                 versionRoot: Link,
                 vertexOffsetStart: number,
-                vertexCount: number
+                vertexCount: number,
+                graphDepth: number
             ) => Promise<Block>
         },
         { indexCreate, indexSearch }: IndexStore = {
@@ -535,7 +537,11 @@ class Graph implements ElementAccessor {
     tx() {
         return new Tx(this)
     }
-
+    /**
+     * Pack a complete graph
+     * @param versionRoot - the version root
+     * @returns - a block containing the packed graph
+     */
     async packGraphVersion(versionRoot?: Link): Promise<Block> {
         const { root } =
             versionRoot === undefined
@@ -543,16 +549,32 @@ class Graph implements ElementAccessor {
                 : { root: versionRoot }
         return await this.packGraph(root)
     }
+
+    /**
+     * Pack a graph fragment
+     * 
+     * @param vertexOffsetStart - the offset of the first vertex
+     * @param vertexCount - the number of vertices, counting from the first vertex
+     * @param graphDepth - the depth of the fragment
+     * @param versionRoot - the version root
+     * @returns - a block containing the packed graph fragment
+     */
     async packGraphFragment(
         vertexOffsetStart: number,
         vertexCount: number,
+        graphDepth: number,
         versionRoot?: Link
     ): Promise<Block> {
         const { root } =
             versionRoot === undefined
                 ? await this.rootGet()
                 : { root: versionRoot }
-        return await this.packComputed(root, vertexOffsetStart, vertexCount)
+        return await this.packComputed(
+            root,
+            vertexOffsetStart,
+            vertexCount,
+            graphDepth
+        )
     }
 }
 

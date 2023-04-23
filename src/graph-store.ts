@@ -121,7 +121,8 @@ interface GraphStore {
     packComputed: (
         versionRoot: Link,
         vertexOffsetStart: number,
-        vertexCount: number
+        vertexCount: number,
+        graphDepth: number
     ) => Promise<Block>
 }
 
@@ -711,13 +712,15 @@ const graphStore = ({
     const packComputed = async (
         versionRoot: Link,
         vertexOffsetStart: number,
-        vertexCount: number
+        vertexCount: number,
+        graphDepth: number
     ): Promise<Block> => {
-        const { packComputed } = graphPackerFactory(linkCodec)
-        return packComputed(
+        const { packComputed: pack } = graphPackerFactory(linkCodec)
+        return pack(
             versionRoot,
             vertexOffsetStart,
             vertexCount,
+            graphDepth,
             blockStore,
             chunk,
             valueCodec
