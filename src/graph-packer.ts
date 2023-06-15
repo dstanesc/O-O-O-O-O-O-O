@@ -34,6 +34,16 @@ const { read } = chunkyStore()
  */
 interface GraphPacker {
     /**
+     * Packs a complete graph story into a single block.
+     */
+    packVersionStore: (
+        versionStoreRoot: Link,
+        fromStore: BlockStore,
+        chunk: (buffer: Uint8Array) => Uint32Array,
+        valueCodec: ValueCodec
+    ) => Promise<Block>
+
+    /**
      * Packs a complete graph version into a single block.
      */
     packGraph: (versionRoot: Link, fromStore: BlockStore) => Promise<Block>
@@ -73,15 +83,33 @@ interface GraphPacker {
         graphDepth: number,
         fromStore: BlockStore
     ) => Promise<Block>
+
     /**
-     * Unpacks and restores packed data into a block store.
+     * Unpacks and restores packed graph data into a block store.
      */
     restore: (
         pack: Uint8Array,
         intoStore: BlockStore
     ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+
     /**
-     * Unpacks packed data
+     * Unpacks and restores single index data into a block store.
+     */
+    restoreSingleIndex: (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ) => Promise<{
+        root: Link
+        index: {
+            startOffsets: Map<number, any>
+            indexSize: number
+            byteArraySize: number
+        }
+        blocks: Block[]
+    }>
+
+    /**
+     * Unpacks graph packed data
      */
     unpack: (
         pack: Uint8Array
@@ -374,6 +402,36 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         return { cid, bytes }
     }
 
+    const packVersionStore = async (
+        versionStoreRoot: Link,
+        fromStore: BlockStore,
+        chunk: (buffer: Uint8Array) => Uint32Array,
+        valueCodec: ValueCodec
+    ): Promise<Block> => {
+        const versionStore: VersionStore = await versionStoreFactory({
+            storeRoot: versionStoreRoot,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: fromStore,
+        })
+        const { index: versionStoreIndex } = await versionStore.blocksExtract()
+        const carRoots = [CID.asCID(versionStoreRoot)]
+        let bufferSize = CarBufferWriter.headerLength({ roots: carRoots })
+        bufferSize += await computeSize([versionStoreRoot], fromStore)
+        const { startOffsets } = versionStoreIndex.indexStruct
+        bufferSize += await computeSize(startOffsets.values(), fromStore)
+        const buffer = new Uint8Array(bufferSize)
+        const writer: Writer = CarBufferWriter.createWriter(buffer, {
+            roots: carRoots,
+        })
+        await writeMany(carRoots, fromStore, writer)
+        await writeMany(startOffsets.values(), fromStore, writer)
+        const bytes = writer.close()
+        const cid = await linkCodec.encode(bytes)
+        return { cid, bytes }
+    }
+
     const packGraph = async (
         versionRoot: Link,
         fromStore: BlockStore
@@ -415,7 +473,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         const writer: Writer = CarBufferWriter.createWriter(buffer, {
             roots: carRoots,
         })
-        await writeMany([versionRoot], fromStore, writer)
+        await writeMany(carRoots, fromStore, writer)
         await writeMany(roots, fromStore, writer)
         for (const idx of indexes) {
             const { startOffsets } = idx.indexStruct
@@ -697,7 +755,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         const roots = [vertexRoot, edgeRoot, propRoot, valueRoot, indexRoot]
         const carRoots = [CID.asCID(versionRoot)]
         let bufferSize = CarBufferWriter.headerLength({ roots: carRoots })
-        bufferSize += await computeSize([versionRoot], fromStore)
+        bufferSize += await computeSize(carRoots, fromStore)
         bufferSize += await computeSize(roots, fromStore)
 
         let edgeOffsetStart = 0
@@ -799,7 +857,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
             levelEdges = Array.from(targetEdges)
             levelProps = Array.from(targetProps)
         }
-        await pushMany([versionRoot], fromStore, blocks)
+        await pushMany(carRoots, fromStore, blocks)
         await pushMany(roots, fromStore, blocks)
         const buffer = new Uint8Array(bufferSize)
         const writer: Writer = CarBufferWriter.createWriter(buffer, {
@@ -842,12 +900,41 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         return { root, index, blocks }
     }
 
+    const restoreSingleIndex = async (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ): Promise<{
+        root: Link
+        index: {
+            startOffsets: Map<number, any>
+            indexSize: number
+            byteArraySize: number
+        }
+        blocks: Block[]
+    }> => {
+        const reader = await CarReader.fromBytes(packBytes)
+        const [root] = await reader.getRoots()
+        const blocks: Block[] = []
+        for await (const { cid, bytes } of reader.blocks()) {
+            blocks.push({ cid, bytes })
+            await intoStore.put({ cid, bytes })
+        }
+        const { buildChunkyIndex } = blockIndexFactory({
+            linkCodec,
+            blockStore: intoStore,
+        })
+        const { indexStruct } = await buildChunkyIndex(root)
+
+        return { root, index: indexStruct, blocks }
+    }
     return {
+        packVersionStore,
         packGraph,
         packCommit,
         packComputed,
         packFragment,
         restore,
+        restoreSingleIndex,
         unpack,
     }
 }

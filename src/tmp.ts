@@ -136,7 +136,27 @@ async function publish() {
             .toString()}`
     )
 
-    // root=bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi, storeRoot=bafkreiedmcs5c7ptckhdy2phhra65xridwt3ut7zozhou3qy3risqtrx2q
+    console.log("Version store identity", versionStore.id())
+    console.log("Version store log", versionStore.log())
+    
+    const {
+        root: versionStoreRoot,
+        index: versionStoreIndex,
+        blocks: versionStoreBlocks,
+    } = await versionStore.blocksExtract()
+
+    console.log(versionStoreIndex)
+
+    for (const block of versionStoreBlocks) {
+        console.log(`Writing block ${block.cid.toString()}`)
+        await blockStore.put(block)
+    }
+
+    console.log(
+        `Version store written root=${versionStoreRoot.toString()}, storeRoot=${versionStore
+            .versionStoreRoot()
+            .toString()}`
+    )
 }
 
 async function query() {
@@ -217,5 +237,5 @@ async function queryVerse(
     return { result: vr[0].value, time }
 }
 
-//await publish()
-await query()
+await publish()
+// await query()

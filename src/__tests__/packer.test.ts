@@ -127,6 +127,57 @@ async function quickVerse(
 }
 
 describe('Graph packer', function () {
+    test('pack and restore version store versionx', async () => {
+        const cache = {}
+        const ipfs = ipfsApi({ url: process.env.IPFS_API })
+        const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const valueCodec: ValueCodec = valueCodecFactory()
+        const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
+        const versionStoreRoot = linkCodec.parseString(
+            'bafkreidlnlkwfgzxw4rvwmqpg73snceph7gf3blui64ozwzxtjhyjkjh54'
+        )
+
+        /*
+         * Packing and restoring
+         */
+        const { packVersionStore, restoreSingleIndex: restoreVersionStore } =
+            graphPackerFactory(linkCodec)
+
+        const bundle: Block = await packVersionStore(
+            versionStoreRoot,
+            blockStore,
+            chunk,
+            valueCodec
+        )
+
+        const memStore: BlockStore = memoryBlockStoreFactory()
+
+        await restoreVersionStore(bundle.bytes, memStore)
+
+        const versionStore: VersionStore = await versionStoreFactory({
+            storeRoot: versionStoreRoot,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: memStore,
+        })
+
+        assert.equal(
+            'bafkreiep4fey4tsqkt3ewglsifoxbdhc74xechba272sl5iwqgmcykezvi',
+            versionStore.id()
+        )
+        assert.equal(
+            'bafkreidlnlkwfgzxw4rvwmqpg73snceph7gf3blui64ozwzxtjhyjkjh54',
+            versionStore.versionStoreRoot()
+        )
+        assert.equal(1, versionStore.log().length)
+        assert.equal(
+            'bafkreiegljjns2rqb3z5mtdyvq2u6u2cvsahyez6bqsdjibo6737vrqhbi',
+            versionStore.currentRoot().toString()
+        )
+    })
+
     test('pack and restore full graph', async () => {
         const cache = {}
         const ipfs = ipfsApi({ url: process.env.IPFS_API })

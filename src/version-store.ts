@@ -14,6 +14,8 @@ interface VersionStore {
 
     versionStoreRoot: () => Link
 
+    currentRoot: () => Link
+
     rootSet: ({
         root,
         index,
@@ -39,6 +41,19 @@ interface VersionStore {
     checkout: (root: Link) => void
 
     log: () => Version[]
+
+    blocksExtract: () => Promise<{
+        root: any
+        index: {
+            indexStruct: {
+                startOffsets: Map<number, any>
+                indexSize: number
+                byteArraySize: number
+            }
+            indexBuffer: Uint8Array
+        }
+        blocks: { cid: any; bytes: Uint8Array }[]
+    }>
 }
 
 const VERSION_UNDEFINED = { version: undefined, index: undefined }
@@ -65,7 +80,7 @@ const versionStoreFactory = async ({
     const indices = new Map<string, RootIndex>()
     let identity: Link
     let byteArrayRoot: Link
-    let currentVersion: string
+    let currentVersion: Link
     const { buildRootIndex } = blockIndexFactory({
         linkCodec,
         blockStore,
@@ -76,7 +91,6 @@ const versionStoreFactory = async ({
         const versionArray = Array.from(versions.values())
         return versionArray.reverse()
     }
-
     const init = async (storeRoot?: Link): Promise<void> => {
         if (storeRoot !== undefined) {
             const bytes = await readAll({
@@ -92,8 +106,7 @@ const versionStoreFactory = async ({
             byteArrayRoot = storeRoot
             versionArray.forEach((v) => versions.set(v.root.toString(), v))
             identity = storeId
-            currentVersion =
-                versionArray[versionArray.length - 1].root.toString()
+            currentVersion = versionArray[versionArray.length - 1].root
         } else {
             const bytes = uuidParse(uuidV4())
             const buffer = new Uint8Array(16)
@@ -114,23 +127,11 @@ const versionStoreFactory = async ({
         }
         versions.set(version.root.toString(), version)
         indices.set(version.root.toString(), index)
-        currentVersion = version.root.toString()
+        currentVersion = version.root
 
         if (!readOnly) {
-            const buf = new VersionEncoder(
-                identity,
-                Array.from(versions.values()),
-                valueCodec.encode
-            ).write()
-
-            const { root, blocks } = await create({
-                buf,
-                chunk,
-                encode: linkCodec.encode,
-            })
-
+            const { root, blocks } = await blocksExtract()
             byteArrayRoot = root
-
             for (const block of blocks) {
                 await blockStore.put(block)
             }
@@ -138,13 +139,38 @@ const versionStoreFactory = async ({
         } else return undefined
     }
 
+    const blocksExtract = async (): Promise<{
+        root: any
+        index: {
+            indexStruct: {
+                startOffsets: Map<number, any>
+                indexSize: number
+                byteArraySize: number
+            }
+            indexBuffer: Uint8Array
+        }
+        blocks: { cid: any; bytes: Uint8Array }[]
+    }> => {
+        const buf = new VersionEncoder(
+            identity,
+            Array.from(versions.values()),
+            valueCodec.encode
+        ).write()
+        const { root, index, blocks } = await create({
+            buf,
+            chunk,
+            encode: linkCodec.encode,
+        })
+        return { root, index, blocks }
+    }
+
     const versionGet = async (): Promise<{
         version: Version
         index: RootIndex
     }> => {
         if (currentVersion !== undefined) {
-            const version: Version = versions.get(currentVersion)
-            const index: RootIndex = indices.get(currentVersion)
+            const version: Version = versions.get(currentVersion.toString())
+            const index: RootIndex = indices.get(currentVersion.toString())
             if (index !== undefined) return { version, index }
             else {
                 const { index } = await buildRootIndex(version.root)
@@ -160,9 +186,15 @@ const versionStoreFactory = async ({
         root: Link
         index?: RootIndex
     }): Promise<Link> => {
-        const details: VersionDetails = { timestamp: Date.now() }
-        const version: Version = { root, details }
-        return await versionSet({ version, index })
+        const existingVersion = versions.get(root.toString())
+        if (existingVersion !== undefined) {
+            currentVersion = existingVersion.root
+            return existingVersion.root
+        } else {
+            const details: VersionDetails = { timestamp: Date.now() }
+            const version: Version = { root, details }
+            return await versionSet({ version, index })
+        }
     }
 
     const rootGet = async (): Promise<{ root: Link; index: RootIndex }> => {
@@ -173,18 +205,20 @@ const versionStoreFactory = async ({
     }
 
     const checkout = (root: Link) => {
-        const requestedVersion = root.toString()
-        if (versions.has(requestedVersion)) {
-            currentVersion = requestedVersion
-        } else throw new Error(`Unknown version ${requestedVersion}`)
+        if (versions.has(root.toString())) {
+            currentVersion = root
+        } else throw new Error(`Unknown version ${root.toString()}`)
     }
 
     await init(storeRoot)
 
-    if (versionRoot !== undefined) await rootSet({ root: versionRoot })
+    if (versionRoot !== undefined) {
+        await rootSet({ root: versionRoot })
+    }
 
     return {
         id,
+        currentRoot: () => currentVersion,
         versionStoreRoot,
         versionSet,
         versionGet,
@@ -192,6 +226,7 @@ const versionStoreFactory = async ({
         rootGet,
         checkout,
         log,
+        blocksExtract,
     }
 }
 
