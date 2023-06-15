@@ -859,7 +859,8 @@ class VersionEncoder extends BinaryEncoder {
         this.valueEncode = valueEncode
     }
     writeDetails(details: VersionDetails) {
-        const bytes: Uint8Array = this.valueEncode(details)
+        const purgedDetails = fastCloneVersionDetails(details)
+        const bytes: Uint8Array = this.valueEncode(purgedDetails)
         const length = bytes.byteLength
         this.writeUInt(length) // 4
         this.writeBytes(bytes) // n
