@@ -1,13 +1,21 @@
 import { BlockStore } from './block-store'
 import { BlockCodec, LinkCodec, ValueCodec } from './codecs'
-import { Link, RootIndex, Version, VersionDetails } from './types'
+import { Block, Link, RootIndex, Version, VersionDetails } from './types'
 import { chunkyStore } from '@dstanesc/store-chunky-bytes'
 import { VersionDecoder, VersionEncoder } from './serde'
 import { v4 as uuidV4, parse as uuidParse } from 'uuid'
 
 import { blockIndexFactory } from './block-index'
+import { MergePolicyEnum, merge } from './merge'
+import { graphPackerFactory } from './graph-packer'
 
 const { create, readAll } = chunkyStore()
+
+interface VersionStoreDiff {
+    last: Version | undefined
+    common: Version[]
+    missing: Version[]
+}
 
 interface VersionStore {
     id: () => string
@@ -54,6 +62,17 @@ interface VersionStore {
         }
         blocks: { cid: any; bytes: Uint8Array }[]
     }>
+
+    diff: (other: VersionStore) => VersionStoreDiff
+
+    packMissingBlocks: (
+        other: VersionStore,
+        otherBlockStore: BlockStore
+    ) => Promise<Block>
+
+    mergeVersions: (
+        other: VersionStore
+    ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
 }
 
 const VERSION_UNDEFINED = { version: undefined, index: undefined }
@@ -210,6 +229,115 @@ const versionStoreFactory = async ({
         } else throw new Error(`Unknown version ${root.toString()}`)
     }
 
+    const diff = (other: VersionStore): VersionStoreDiff => {
+        if (other.id() !== id())
+            throw new Error(
+                `Cannot compare version stores with different identities ${other.id()} !== ${id()}`
+            )
+        const otherLog = other.log()
+        let missing: Version[] = []
+        let common: Version[] = []
+        for (const version of otherLog) {
+            if (versions.has(version.root.toString())) {
+                common.push(version)
+            } else {
+                missing.push(version)
+            }
+        }
+        return {
+            last: common.length > 0 ? common[0] : undefined,
+            common,
+            missing,
+        }
+    }
+
+    const loadBlocks = async (
+        cids: Set<any>,
+        otherBlockStore: BlockStore
+    ): Promise<Block[]> => {
+        const out: Block[] = []
+        for (const cid of cids) {
+            out.push({ cid, bytes: await otherBlockStore.get(cid) })
+        }
+        return out
+    }
+
+    const findMissingBlocks = async (
+        other: VersionStore,
+        otherBlockStore: BlockStore
+    ): Promise<Set<any>> => {
+        const { last, common, missing }: VersionStoreDiff = diff(other)
+        const out = new Set()
+        const { buildRootIndex } = blockIndexFactory({
+            linkCodec,
+            blockStore: otherBlockStore,
+        })
+        for (const version of missing) {
+            out.add(version.root)
+            const { index: rootIndex } = await buildRootIndex(version.root)
+            out.add(rootIndex.vertexRoot)
+            out.add(rootIndex.edgeRoot)
+            out.add(rootIndex.propRoot)
+            out.add(rootIndex.valueRoot)
+            out.add(rootIndex.indexRoot)
+            for (const cid of rootIndex.vertexIndex.indexStruct.startOffsets.values()) {
+                out.add(cid)
+            }
+            for (const cid of rootIndex.edgeIndex.indexStruct.startOffsets.values()) {
+                out.add(cid)
+            }
+            for (const cid of rootIndex.propIndex.indexStruct.startOffsets.values()) {
+                out.add(cid)
+            }
+            for (const cid of rootIndex.valueIndex.indexStruct.startOffsets.values()) {
+                out.add(cid)
+            }
+            for (const cid of rootIndex.indexIndex.indexStruct.startOffsets.values()) {
+                out.add(cid)
+            }
+        }
+        return out
+    }
+
+    const packMissingBlocks = async (
+        other: VersionStore,
+        otherBlockStore: BlockStore
+    ): Promise<Block> => {
+        const { packRandomBlocks } = graphPackerFactory(linkCodec)
+        const missing: Set<any> = await findMissingBlocks(
+            other,
+            otherBlockStore
+        )
+        const blocks: Block[] = await loadBlocks(missing, otherBlockStore)
+        const bundle: Block = await packRandomBlocks(blocks)
+        return bundle
+    }
+
+    const mergeVersions = async (
+        other: VersionStore
+    ): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> => {
+        const { last, common, missing }: VersionStoreDiff = diff(other)
+        const first = currentVersion
+        const second = other.currentRoot()
+        const { root, index, blocks } = await merge(
+            {
+                baseRoot: last.root,
+                baseStore: blockStore,
+                currentRoot: first,
+                currentStore: blockStore,
+                otherRoot: second,
+                otherStore: blockStore,
+            },
+            MergePolicyEnum.MultiValueRegistry,
+            chunk,
+            linkCodec,
+            valueCodec
+        )
+        // TODO: other versions?
+        rootSet({ root, index })
+        return { root, index, blocks }
+    }
+
     await init(storeRoot)
 
     if (versionRoot !== undefined) {
@@ -227,7 +355,10 @@ const versionStoreFactory = async ({
         checkout,
         log,
         blocksExtract,
+        diff,
+        packMissingBlocks,
+        mergeVersions,
     }
 }
 
-export { versionStoreFactory, VersionStore }
+export { versionStoreFactory, VersionStore, VersionStoreDiff }

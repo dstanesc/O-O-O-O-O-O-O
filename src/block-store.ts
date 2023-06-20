@@ -4,6 +4,12 @@ interface BlockStore {
 }
 
 interface MemoryBlockStore extends BlockStore {
+    content: () => Set<string>
+    diff: (otherStore: BlockStore) => {
+        missingLocal: Set<string>
+        missingOther: Set<string>
+        intersection: Set<string>
+    }
     push: (otherStore: BlockStore) => Promise<void>
     countReads: () => number
     resetReads: () => void
@@ -35,13 +41,48 @@ const memoryBlockStoreFactory = (): MemoryBlockStore => {
         }
     }
 
+    const diff = (
+        otherStore: MemoryBlockStore
+    ): {
+        missingLocal: Set<string>
+        missingOther: Set<string>
+        intersection: Set<string>
+    } => {
+        const missingLocal = new Set<string>()
+        const missingOther = new Set<string>()
+        const intersection = new Set<string>()
+        const localCids = content()
+        const otherCids = otherStore.content()
+        for (const cid of localCids) {
+            if (otherCids.has(cid)) {
+                intersection.add(cid)
+            } else {
+                missingOther.add(cid)
+            }
+        }
+        for (const cid of otherCids) {
+            if (!localCids.has(cid)) {
+                missingLocal.add(cid)
+            }
+        }
+        return { missingLocal, missingOther, intersection }
+    }
+
+    const content = (): Set<string> => {
+        const out = new Set<string>()
+        for (const cid of Object.keys(blocks)) {
+            out.add(cid.toString())
+        }
+        return out
+    }
+
     const countReads = () => readCounter
 
     const resetReads = () => (readCounter = 0)
 
     const size = () => Object.keys(blocks).length
 
-    return { get, put, push, countReads, resetReads, size }
+    return { get, put, push, countReads, resetReads, size, diff, content }
 }
 
 export { BlockStore, MemoryBlockStore, memoryBlockStoreFactory }

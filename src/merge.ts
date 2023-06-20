@@ -1,6 +1,6 @@
 import { BlockStore } from './block-store'
 import { fastCloneEdge, fastCloneProp, fastCloneVertex } from './clone'
-import { Link, Part, Vertex, Edge, Prop, RootIndex } from './types'
+import { Link, Part, Vertex, Edge, Prop, RootIndex, Block } from './types'
 import { BaselineDelta, deltaFactory, DeltaFactory } from './delta'
 import { Graph, Tx } from './graph'
 import { blockIndexFactory } from './block-index'
@@ -154,8 +154,8 @@ const merge = async (
     policy: MergePolicyEnum,
     chunk: (buffer: Uint8Array) => Uint32Array,
     linkCodec: LinkCodec,
-    valueCodec: ValueCodec,
-) => {
+    valueCodec: ValueCodec
+): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> => {
     const mergeOrder = <T>({ current, other }: { current: T; other: T }) => {
         return currentRoot.bytes[0] < otherRoot.bytes[0]
             ? { first: current, second: other }

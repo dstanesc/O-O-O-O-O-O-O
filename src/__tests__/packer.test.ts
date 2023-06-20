@@ -127,7 +127,59 @@ async function quickVerse(
 }
 
 describe('Graph packer', function () {
-    test('pack and restore version store versionx', async () => {
+    test('pack and restore random blocks', async () => {
+        const cache = {}
+        const ipfs = ipfsApi({ url: process.env.IPFS_API })
+        const linkCodec: LinkCodec = linkCodecFactory()
+        const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
+        const bytes1 = await blockStore.get(
+            'bafkreigu3fodriojosw3irmjz6v2znxli243n3xstcg575taxxjmctwu64'
+        )
+        const bytes2 = await blockStore.get(
+            'bafkreihxekffa3coj4gpdmx2x5vteix5t5exrxfd7t4erqibj3mvw4rzm4'
+        )
+        const bytes3 = await blockStore.get(
+            'bafkreib55oovsq4oxgiszoi43bsavb4raonyydlcyk6wx75hmb2ehkkikm'
+        )
+        const block1 = {
+            bytes: bytes1,
+            cid: linkCodec.parseString(
+                'bafkreigu3fodriojosw3irmjz6v2znxli243n3xstcg575taxxjmctwu64'
+            ),
+        }
+        const block2 = {
+            bytes: bytes2,
+            cid: linkCodec.parseString(
+                'bafkreihxekffa3coj4gpdmx2x5vteix5t5exrxfd7t4erqibj3mvw4rzm4'
+            ),
+        }
+        const block3 = {
+            bytes: bytes3,
+            cid: linkCodec.parseString(
+                'bafkreib55oovsq4oxgiszoi43bsavb4raonyydlcyk6wx75hmb2ehkkikm'
+            ),
+        }
+        const { packRandomBlocks, restoreRandomBlocks } =
+            graphPackerFactory(linkCodec)
+        const bundle: Block = await packRandomBlocks([block1, block2, block3])
+        const memStore: BlockStore = memoryBlockStoreFactory()
+        const restored: Block[] = await restoreRandomBlocks(
+            bundle.bytes,
+            memStore
+        )
+        expect(restored.length).toBe(3)
+        expect(restored[0].cid.toString()).toBe(
+            'bafkreigu3fodriojosw3irmjz6v2znxli243n3xstcg575taxxjmctwu64'
+        )
+        expect(restored[1].cid.toString()).toBe(
+            'bafkreihxekffa3coj4gpdmx2x5vteix5t5exrxfd7t4erqibj3mvw4rzm4'
+        )
+        expect(restored[2].cid.toString()).toBe(
+            'bafkreib55oovsq4oxgiszoi43bsavb4raonyydlcyk6wx75hmb2ehkkikm'
+        )
+    })
+
+    test('pack and restore version store', async () => {
         const cache = {}
         const ipfs = ipfsApi({ url: process.env.IPFS_API })
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
@@ -178,7 +230,7 @@ describe('Graph packer', function () {
         )
     })
 
-    test('pack and restore full graph', async () => {
+    test('pack and restore full graph graphx', async () => {
         const cache = {}
         const ipfs = ipfsApi({ url: process.env.IPFS_API })
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
@@ -206,6 +258,10 @@ describe('Graph packer', function () {
         const memStore: BlockStore = memoryBlockStoreFactory()
 
         const { root, index, blocks } = await restore(bundle.bytes, memStore)
+
+        for (const block of blocks) {
+            console.log(`Block: ${block.cid.toString()}`)
+        }
 
         console.log(
             `Unpacked graph root: ${linkCodec.encodeString(

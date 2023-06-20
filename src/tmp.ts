@@ -136,27 +136,8 @@ async function publish() {
             .toString()}`
     )
 
-    console.log("Version store identity", versionStore.id())
-    console.log("Version store log", versionStore.log())
-    
-    const {
-        root: versionStoreRoot,
-        index: versionStoreIndex,
-        blocks: versionStoreBlocks,
-    } = await versionStore.blocksExtract()
-
-    console.log(versionStoreIndex)
-
-    for (const block of versionStoreBlocks) {
-        console.log(`Writing block ${block.cid.toString()}`)
-        await blockStore.put(block)
-    }
-
-    console.log(
-        `Version store written root=${versionStoreRoot.toString()}, storeRoot=${versionStore
-            .versionStoreRoot()
-            .toString()}`
-    )
+    console.log('Version store identity', versionStore.id())
+    console.log('Version store log', versionStore.log())
 }
 
 async function query() {

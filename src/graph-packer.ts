@@ -114,6 +114,13 @@ interface GraphPacker {
     unpack: (
         pack: Uint8Array
     ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+
+    packRandomBlocks: (blocks: Block[]) => Promise<Block>
+
+    restoreRandomBlocks: (
+        pack: Uint8Array,
+        intoStore: BlockStore
+    ) => Promise<Block[]>
 }
 
 const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
@@ -331,13 +338,6 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
                 { startOffset: offset, length: recordSize },
                 recordArraySize
             )
-            // if (cids.length > 0) {
-            //     const uniqueCids = cids.filter(cid => !blocksAdded.has(cid.toString()));
-            //     if (uniqueCids.length > 0) {
-            //         await pushMany(uniqueCids, fromStore, blocks);
-            //         uniqueCids.forEach(cid => blocksAdded.add(cid.toString()));
-            //     }
-            // }
             for (const cid of cids) {
                 if (!blocksAdded.has(cid.toString())) {
                     await pushMany([cid], fromStore, blocks)
@@ -927,7 +927,44 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
 
         return { root, index: indexStruct, blocks }
     }
+
+    const packRandomBlocks = async (blocks: Block[]): Promise<Block> => {
+        let bufferSize = 0
+        bufferSize += CarBufferWriter.headerLength({ roots: [] })
+        for (const block of blocks) {
+            bufferSize += CarBufferWriter.blockLength({
+                cid: CID.asCID(block.cid),
+                bytes: block.bytes,
+            })
+        }
+        const buffer = new Uint8Array(bufferSize)
+        const writer: Writer = CarBufferWriter.createWriter(buffer)
+        for (const block of blocks) {
+            writer.write({
+                cid: CID.asCID(block.cid),
+                bytes: block.bytes,
+            })
+        }
+        const bytes = writer.close()
+        const cid = await linkCodec.encode(bytes)
+        return { cid, bytes }
+    }
+
+    const restoreRandomBlocks = async (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ): Promise<Block[]> => {
+        const reader = await CarReader.fromBytes(packBytes)
+        const blocks: Block[] = []
+        for await (const { cid, bytes } of reader.blocks()) {
+            blocks.push({ cid, bytes })
+            await intoStore.put({ cid, bytes })
+        }
+        return blocks
+    }
+
     return {
+        packRandomBlocks,
         packVersionStore,
         packGraph,
         packCommit,
@@ -935,6 +972,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         packFragment,
         restore,
         restoreSingleIndex,
+        restoreRandomBlocks,
         unpack,
     }
 }
