@@ -176,7 +176,6 @@ describe('Filter data', function () {
             .exec()) {
             vr.push(result)
         }
-        vr.forEach((r) => console.log(r))
 
         assert.equal(vr.length, 1)
         assert.equal(vr[0].offset, 50)

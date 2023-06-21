@@ -90,8 +90,6 @@ describe('Api', function () {
 
         const { vertexOffset, edgeOffset, propOffset } = index
 
-        console.log(root.toString())
-
         assert.equal(OFFSET_INCREMENTS.VERTEX_INCREMENT * 3, vertexOffset)
         assert.equal(OFFSET_INCREMENTS.EDGE_INCREMENT * 2, edgeOffset)
         assert.equal(OFFSET_INCREMENTS.PROP_INCREMENT * 2, propOffset)
@@ -157,8 +155,6 @@ describe('Api', function () {
         assert.equal(OFFSET_INCREMENTS.VERTEX_INCREMENT * 3, vertexOffset)
         assert.equal(OFFSET_INCREMENTS.EDGE_INCREMENT * 2, edgeOffset)
         assert.equal(OFFSET_INCREMENTS.PROP_INCREMENT * 2, propOffset)
-
-        console.log(root.toString())
 
         assert.equal(
             'bafkreihfd57xnxauil7q4cqr6hj5cnf4geer7pte2v54i7gaijw7lhkndu',
@@ -252,8 +248,6 @@ describe('Api', function () {
             propIndex,
         } = index
 
-        console.log(root.toString())
-
         assert.equal(OFFSET_INCREMENTS.VERTEX_INCREMENT * 3, vertexOffset)
         assert.equal(OFFSET_INCREMENTS.EDGE_INCREMENT * 2, edgeOffset)
         assert.equal(OFFSET_INCREMENTS.PROP_INCREMENT * 4, propOffset)
@@ -283,7 +277,6 @@ describe('Api', function () {
         )) {
             edgeResults.push(result)
         }
-        edgeResults.forEach((r) => console.log(r))
 
         // first edge
         assert.equal(0, edgeResults[0].offset)
@@ -340,7 +333,6 @@ describe('Api', function () {
         )) {
             vertexResults.push(result)
         }
-        vertexResults.forEach((r) => console.log(r))
 
         // first vertex
         assert.equal(25, vertexResults[0].offset)
@@ -393,7 +385,6 @@ describe('Api', function () {
         )) {
             propResults.push(result)
         }
-        propResults.forEach((r) => console.log(r))
 
         assert.equal(4, propResults.length)
 
@@ -488,7 +479,6 @@ describe('Api', function () {
         )) {
             propResults.push(result)
         }
-        propResults.forEach((r) => console.log(r))
 
         assert.equal(2, propResults.length)
 

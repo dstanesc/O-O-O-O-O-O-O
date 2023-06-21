@@ -95,10 +95,6 @@ describe('Version management', function () {
             tags: ['v0.0.1'],
         })
 
-        // const fileso = await query(original)
-
-        // console.log(fileso)
-
         /**
          * Revise original, first change
          */
@@ -357,8 +353,6 @@ describe('Version management', function () {
         const versions = story.log()
 
         assert.strictEqual(versions.length, 4)
-
-        versions.forEach((v) => console.log(v))
 
         /**
          * Current version is parented by the original version

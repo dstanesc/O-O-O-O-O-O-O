@@ -137,6 +137,7 @@ type Tag = any
 type Version = {
     root: Link
     parent?: Link
+    mergeParent?: Link
     details: VersionDetails
 }
 

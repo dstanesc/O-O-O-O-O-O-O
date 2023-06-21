@@ -201,9 +201,13 @@ const versionStoreFactory = async ({
     const rootSet = async ({
         root,
         index,
+        parent,
+        mergeParent,
     }: {
         root: Link
         index?: RootIndex
+        parent?: Link
+        mergeParent?: Link
     }): Promise<Link> => {
         const existingVersion = versions.get(root.toString())
         if (existingVersion !== undefined) {
@@ -212,6 +216,12 @@ const versionStoreFactory = async ({
         } else {
             const details: VersionDetails = { timestamp: Date.now() }
             const version: Version = { root, details }
+            if (parent !== undefined) {
+                version.parent = parent
+            }
+            if (mergeParent !== undefined) {
+                version.mergeParent = mergeParent
+            }
             return await versionSet({ version, index })
         }
     }
@@ -334,7 +344,7 @@ const versionStoreFactory = async ({
             valueCodec
         )
         // TODO: other versions?
-        rootSet({ root, index })
+        rootSet({ root, index, parent: first, mergeParent: second })
         return { root, index, blocks }
     }
 

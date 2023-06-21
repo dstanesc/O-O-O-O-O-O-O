@@ -207,14 +207,14 @@ describe('Merge graphs', function () {
 
         const mergedFilesLww = await query(mergeRootLww)
 
-        //mergedFilesLww.forEach(r => console.log(r))
-
         assert.strictEqual(mergedFilesLww.length, 3)
         assert.strictEqual(mergedFilesLww[0].value, 'nested-folder')
         assert.strictEqual(mergedFilesLww[1].value, 'nested-file')
         assert.strictEqual(mergedFilesLww[2].value, 'nested-file-user-1')
     })
 })
+
+
 
 const query = async (versionRoot: Link): Promise<Prop[]> => {
     const versionStore: VersionStore = await versionStoreFactory({

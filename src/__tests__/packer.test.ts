@@ -73,8 +73,6 @@ async function queryVerse(
     }
     const endTime = new Date().getTime()
     const time = endTime - startTime
-    console.log(`Query Time ${time} ms`)
-
     return { result: vr[0].value, time }
 }
 
@@ -102,8 +100,6 @@ async function queryVerseFromBook(
     }
     const endTime = new Date().getTime()
     const time = endTime - startTime
-    console.log(`Query Time ${time} ms`)
-
     return { result: vr[0].value, time }
 }
 
@@ -122,7 +118,6 @@ async function quickVerse(
     }
     const endTime = new Date().getTime()
     const time = endTime - startTime
-    console.log(`Query Time ${time} ms`)
     return { result: vr[0].value, time }
 }
 
@@ -187,7 +182,7 @@ describe('Graph packer', function () {
         const valueCodec: ValueCodec = valueCodecFactory()
         const blockStore: BlockStore = ipfsBlockStore({ cache, ipfs })
         const versionStoreRoot = linkCodec.parseString(
-            'bafkreidlnlkwfgzxw4rvwmqpg73snceph7gf3blui64ozwzxtjhyjkjh54'
+            'bafkreiarwxmqgb7aroqi4wocldxcub25yclf6iz3ey4gmy4fqlnmkqvq3u'
         )
 
         /*
@@ -216,11 +211,11 @@ describe('Graph packer', function () {
         })
 
         assert.equal(
-            'bafkreiep4fey4tsqkt3ewglsifoxbdhc74xechba272sl5iwqgmcykezvi',
+            'bafkreielwa556n5ax2rngrplokqypcds2ypxnq5niufa4ls4l73flwt73i',
             versionStore.id()
         )
         assert.equal(
-            'bafkreidlnlkwfgzxw4rvwmqpg73snceph7gf3blui64ozwzxtjhyjkjh54',
+            'bafkreiarwxmqgb7aroqi4wocldxcub25yclf6iz3ey4gmy4fqlnmkqvq3u',
             versionStore.versionStoreRoot()
         )
         assert.equal(1, versionStore.log().length)
@@ -230,7 +225,7 @@ describe('Graph packer', function () {
         )
     })
 
-    test('pack and restore full graph graphx', async () => {
+    test('pack and restore full graph', async () => {
         const cache = {}
         const ipfs = ipfsApi({ url: process.env.IPFS_API })
         const { chunk } = chunkerFactory(1024 * 48, compute_chunks)
@@ -258,16 +253,6 @@ describe('Graph packer', function () {
         const memStore: BlockStore = memoryBlockStoreFactory()
 
         const { root, index, blocks } = await restore(bundle.bytes, memStore)
-
-        for (const block of blocks) {
-            console.log(`Block: ${block.cid.toString()}`)
-        }
-
-        console.log(
-            `Unpacked graph root: ${linkCodec.encodeString(
-                root
-            )}, block count: ${blocks.length}`
-        )
 
         /**
          * Verifying
@@ -366,9 +351,9 @@ describe('Graph packer', function () {
                 verse_id = entry.verse
                 await tx.addE(RlshpTypes.verse).from(chapter).to(verse).next()
             }
-            console.log(
-                `Book:${entry.book_name}: ${book.offset} Chapter: ${entry.chapter}: ${chapter.offset} Verse: ${entry.verse}: ${verse.offset}`
-            )
+            // console.log(
+            //     `Book:${entry.book_name}: ${book.offset} Chapter: ${entry.chapter}: ${chapter.offset} Verse: ${entry.verse}: ${verse.offset}`
+            // )
         }
 
         const commit = await tx.commit({})
@@ -380,12 +365,6 @@ describe('Graph packer', function () {
         const emptyStore: BlockStore = memoryBlockStoreFactory()
 
         const { root, index, blocks } = await restore(bundle.bytes, emptyStore)
-
-        console.log(
-            `Unpacked commit root: ${linkCodec.encodeString(
-                root
-            )}, block count: ${blocks.length}`
-        )
 
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,
@@ -537,8 +516,6 @@ describe('Graph packer', function () {
         const { restore } = graphPackerFactory(linkCodec)
 
         await restore(bundle.bytes, emptyStore)
-
-        console.log(`Unpacked block count: ${emptyStore.size()}`)
 
         const g2: ProtoGremlin = protoGremlinFactory({
             chunk,

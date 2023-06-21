@@ -53,7 +53,7 @@ const blockStore1: MemoryBlockStore = memoryBlockStoreFactory()
 const blockStore2: MemoryBlockStore = memoryBlockStoreFactory()
 
 describe('Version store merge', function () {
-    test('Revise graphs independently and merge them incl. version tracking', async () => {
+    test('Revise graphs independently, bundle differences, merge results', async () => {
         /**
          * Build original data set
          */
@@ -245,13 +245,38 @@ describe('Version store merge', function () {
             'bafkreigs5zkhwksdnqersuu2nu7jueivtg3w3dzmysv6tmgx5jhi3o53ae'
         )
 
-        const log1r = log1.map((v) => v.root.toString())
-        const log2r = log2.map((v) => v.root.toString())
-        const log3r = log3.map((v) => v.root.toString())
+        assert.equal(
+            log1[0].root.toString(),
+            'bafkreia7homtnphv3je3iwlfl6y3gmdrqrakswsl5sqpcw3gfz25wyfm4q'
+        )
 
-        console.log('log1', log1r)
-        console.log('log2', log2r)
-        console.log('log3', log3r)
+        assert.equal(
+            log1[0].parent.toString(),
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
+        )
+
+        assert.equal(
+            log2[0].root.toString(),
+            'bafkreibgksdipkjqzcuoslti5st6fkrbmu5toju63qvedjuseztdxr64ba'
+        )
+
+        assert.equal(
+            log2[0].parent.toString(),
+            'bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgrue'
+        )
+
+        assert.equal(
+            log3[0].root.toString(),
+            'bafkreigs5zkhwksdnqersuu2nu7jueivtg3w3dzmysv6tmgx5jhi3o53ae'
+        )
+        assert.equal(
+            log3[0].parent.toString(),
+            'bafkreia7homtnphv3je3iwlfl6y3gmdrqrakswsl5sqpcw3gfz25wyfm4q'
+        )
+        assert.equal(
+            log3[0].mergeParent.toString(),
+            'bafkreibgksdipkjqzcuoslti5st6fkrbmu5toju63qvedjuseztdxr64ba'
+        )
 
         const g3 = new Graph(versionStore1, graphStore1)
 
@@ -267,7 +292,7 @@ describe('Version store merge', function () {
         for await (const result of navigateVertices(g3, [0], request)) {
             results.push(result as Prop)
         }
-        results.forEach((r) => console.log(r))
+
         assert.equal(results[3].value, 'nested-file-user-1')
         assert.equal(results[2].value, 'nested-file-user-2')
         assert.equal(results[1].value, 'nested-file')

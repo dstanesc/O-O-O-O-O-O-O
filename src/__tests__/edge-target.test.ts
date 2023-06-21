@@ -90,13 +90,6 @@ describe('Edge, fields computed on commit', function () {
 
         const { root, index } = await tx.commit({})
 
-        console.log(`e7.targetPrev=${e7.targetPrev}`)
-        console.log(`e8.targetPrev=${e8.targetPrev}`)
-        console.log(`e3.targetNext=${e3.targetNext}`)
-
-        console.log(`e3.targetPrev=${e3.targetPrev}`)
-        console.log(`e1.targetNext=${e1.targetNext}`)
-
         assert.strictEqual(e7.targetPrev, e3.offset)
         assert.strictEqual(e3.targetNext, e7.offset)
 
@@ -109,11 +102,9 @@ describe('Edge, fields computed on commit', function () {
 
         const topEdge1 = await toRoot(graph, e7)
         const rootVertex1 = await graph.getVertex(topEdge1.source)
-        console.log(rootVertex1)
 
         const topEdge2 = await toRoot(graph, e8)
         const rootVertex2 = await graph.getVertex(topEdge2.source)
-        console.log(rootVertex2)
 
         const topEdge3 = await toRoot(graph, e4)
         const rootVertex3 = await graph.getVertex(topEdge3.source)

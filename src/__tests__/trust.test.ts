@@ -78,11 +78,7 @@ describe('Trust management', function () {
             signer,
         })
 
-        console.log('root', root)
-
         const versionStoreRoot = versionStore.versionStoreRoot()
-
-        console.log('versionStoreRoot', versionStoreRoot)
 
         /**
          * Simulate a remote read based on the version store root
@@ -109,8 +105,6 @@ describe('Trust management', function () {
             signature: version.details.signature,
         })
 
-        console.log('trusted', trusted)
-
         assert.strictEqual(trusted, true)
 
         /**
@@ -125,7 +119,6 @@ describe('Trust management', function () {
             signature: version.details.signature,
         })
 
-        console.log('untrusted', untrusted)
         assert.strictEqual(untrusted, false)
     })
 })

@@ -832,7 +832,7 @@ class RootDecoder extends BinaryDecoder {
     }
 }
 
-const VERSION_CONST_SIZE_BYTES = 77
+const VERSION_CONST_SIZE_BYTES = 114 // 77
 const VERSION_ID_SIZE_BYTES = 36
 
 class VersionEncoder extends BinaryEncoder {
@@ -871,6 +871,10 @@ class VersionEncoder extends BinaryEncoder {
             this.writeLinkExists() // 1
             this.writeLink(version.parent) // 36
         } else this.skipBytes(37)
+        if (version.mergeParent !== undefined) {
+            this.writeLinkExists() // 1
+            this.writeLink(version.mergeParent) // 36
+        } else this.skipBytes(37)
         this.writeDetails(version.details) // 4 + n
     }
     write() {
@@ -902,10 +906,12 @@ class VersionDecoder extends BinaryDecoder {
     readVersion(): Version {
         const root = this.readLink(this.linkDecode)
         const parent = this.readOptionalLink(this.linkDecode)
+        const mergeParent = this.readOptionalLink(this.linkDecode)
         const details = this.readVersionDetails()
-        return parent === undefined
-            ? { root, details }
-            : { root, parent, details }
+        const version: Version = { root, details }
+        if (parent !== undefined) version.parent = parent
+        if (mergeParent !== undefined) version.mergeParent = mergeParent
+        return version
     }
 
     read(): { id: Link; versions: Version[] } {

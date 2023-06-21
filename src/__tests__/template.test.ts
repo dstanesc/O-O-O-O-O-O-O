@@ -143,12 +143,7 @@ describe('Extract graph data fragments', function () {
 
         const results1 = await firstLevelTemplate(graph, DATA_TEMPLATE_1)
 
-        for (const content of results1) {
-            console.log(content)
-        }
-
         assert.strictEqual(results1.length, 3)
-
         assert.strictEqual(results1[0].name, 'nested-folder-v2')
         assert.strictEqual(results1[0].content, undefined)
         assert.deepStrictEqual(results1[0].includes, [

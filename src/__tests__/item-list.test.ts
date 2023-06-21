@@ -57,8 +57,6 @@ describe('Minimal item list', function () {
             tags: ['v0.0.1'],
         })
 
-        console.log('root', root.toString())
-
         const len = await itemList.length()
         assert.strictEqual(3, len)
 
@@ -92,8 +90,6 @@ describe('Minimal item list', function () {
             comment: 'Second commit',
             tags: ['v0.0.2'],
         })
-
-        console.log('root', root2.toString())
 
         const len2 = await itemList.length()
         assert.strictEqual(6, len2)
@@ -225,12 +221,10 @@ describe('Minimal item list', function () {
             tags: ['v0.0.1'],
         })
 
-        console.log(`root: ${root.toString()}`)
         /**
          * Item range from 25 to 75
          */
         const range: Item[] = await itemList.range(25, 50) // start index, count
-        console.log(range)
         assert.strictEqual(50, range.length)
         for (let i = 0; i < range.length; i++) {
             assert.strictEqual(
@@ -282,8 +276,6 @@ describe('Minimal item list', function () {
                 comment: 'First commit',
                 tags: ['v0.0.1'],
             })
-
-            console.log('original root', root.toString())
         }
 
         {
@@ -331,7 +323,6 @@ describe('Minimal item list', function () {
                 comment: 'First commit',
                 tags: ['v0.0.1'],
             })
-            console.log('second root', root.toString())
         }
         {
             /**

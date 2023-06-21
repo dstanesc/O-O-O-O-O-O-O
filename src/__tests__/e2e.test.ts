@@ -200,13 +200,9 @@ describe('e2e ', function () {
             'The grace of our Lord Jesus Christ be with you all. Amen.'
         )
 
-        console.log(`BlockStore2 total size = ${blockStore2.size()}`)
-
         assert.strictEqual(blockStore.size(), blockStore2.size())
 
         const books = await queryBooks(g3, bible.offset)
-
-        console.log('Books', books)
     })
 
     test('full bible, 7MB json, no index, query first level', async () => {
@@ -345,9 +341,6 @@ describe('e2e ', function () {
             'Jude',
             'Rev',
         ]
-
-        console.log('Books', books)
-
         assert.deepStrictEqual(books, expected)
     })
 
@@ -809,8 +802,6 @@ async function queryBooksTemplateGremlin(
         vr.push(result)
     }
     const endTime = new Date().getTime()
-    console.log(`Query Time ${endTime - startTime} ms`)
-
     return vr
 }
 
