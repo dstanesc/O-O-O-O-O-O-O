@@ -1,7 +1,7 @@
 {
     "name": "@dstanesc/o-o-o-o-o-o-o",
     "description": "O-O-O-O-O-O-O is a collection of content addressed persistent data structures",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "homepage": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "repository": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "license": "(Apache-2.0 AND MIT)",
