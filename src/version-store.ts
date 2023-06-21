@@ -27,9 +27,13 @@ interface VersionStore {
     rootSet: ({
         root,
         index,
+        parent,
+        mergeParent,
     }: {
         root: Link
         index?: RootIndex
+        parent?: Link
+        mergeParent?: Link
     }) => Promise<Link>
 
     versionSet: ({
@@ -327,25 +331,42 @@ const versionStoreFactory = async ({
         other: VersionStore
     ): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> => {
         const { last, common, missing }: VersionStoreDiff = diff(other)
-        const first = currentVersion
-        const second = other.currentRoot()
-        const { root, index, blocks } = await merge(
-            {
-                baseRoot: last.root,
-                baseStore: blockStore,
-                currentRoot: first,
-                currentStore: blockStore,
-                otherRoot: second,
-                otherStore: blockStore,
-            },
-            MergePolicyEnum.MultiValueRegistry,
-            chunk,
-            linkCodec,
-            valueCodec
-        )
-        // TODO: other versions?
-        rootSet({ root, index, parent: first, mergeParent: second })
-        return { root, index, blocks }
+        if (missing.length > 0) {
+            const first = currentVersion
+            const second = other.currentRoot()
+            const { version: otherVersion, index: otherIndex } =
+                await other.versionGet()
+            if (
+                otherVersion.parent !== undefined &&
+                otherVersion.parent.toString() === first.toString()
+            ) {
+                // fast forward
+                rootSet({ root: second, index: otherIndex, parent: first })
+                const { extractVersionBlocks } = graphPackerFactory(linkCodec)
+                const otherBlocks: Block[] = await extractVersionBlocks(
+                    { root: second, index: otherIndex },
+                    blockStore
+                )
+                return { root: second, index: otherIndex, blocks: otherBlocks }
+            } else {
+                const { root, index, blocks } = await merge(
+                    {
+                        baseRoot: last.root,
+                        baseStore: blockStore,
+                        currentRoot: first,
+                        currentStore: blockStore,
+                        otherRoot: second,
+                        otherStore: blockStore,
+                    },
+                    MergePolicyEnum.MultiValueRegistry,
+                    chunk,
+                    linkCodec,
+                    valueCodec
+                )
+                rootSet({ root, index, parent: first, mergeParent: second })
+                return { root, index, blocks }
+            }
+        } else throw new Error(`Nothing to merge`)
     }
 
     await init(storeRoot)

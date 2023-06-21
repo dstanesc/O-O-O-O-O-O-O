@@ -34,6 +34,14 @@ const { read } = chunkyStore()
  */
 interface GraphPacker {
     /**
+     * Extract all blocks that make up a complete graph version.
+     */
+    extractVersionBlocks: (
+        { root, index }: { root: Link; index?: RootIndex },
+        fromStore: BlockStore
+    ) => Promise<Block[]>
+
+    /**
      * Packs a complete graph story into a single block.
      */
     packVersionStore: (
@@ -963,7 +971,49 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         return blocks
     }
 
+    const extractVersionBlocks = async (
+        { root, index }: { root: Link; index?: RootIndex },
+        fromStore: BlockStore
+    ): Promise<Block[]> => {
+        if (index === undefined) {
+            const { buildRootIndex } = blockIndexFactory({
+                linkCodec,
+                blockStore: fromStore,
+            })
+            index = (await buildRootIndex(root)).index
+        }
+        const {
+            vertexIndex,
+            edgeIndex,
+            propIndex,
+            valueIndex,
+            indexIndex,
+            vertexRoot,
+            edgeRoot,
+            propRoot,
+            valueRoot,
+            indexRoot,
+        } = index
+        const indexes = [
+            vertexIndex,
+            edgeIndex,
+            propIndex,
+            valueIndex,
+            indexIndex,
+        ]
+        const roots = [vertexRoot, edgeRoot, propRoot, valueRoot, indexRoot]
+        const blocks = new Set<Block>()
+        await pushMany([root], fromStore, blocks)
+        await pushMany(roots, fromStore, blocks)
+        for (const idx of indexes) {
+            const { startOffsets } = idx.indexStruct
+            await pushMany(startOffsets.values(), fromStore, blocks)
+        }
+        return Array.from(blocks)
+    }
+
     return {
+        extractVersionBlocks,
         packRandomBlocks,
         packVersionStore,
         packGraph,
