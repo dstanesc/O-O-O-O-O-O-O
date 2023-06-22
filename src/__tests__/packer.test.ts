@@ -200,10 +200,13 @@ describe('Graph packer', function () {
 
         const memStore: BlockStore = memoryBlockStoreFactory()
 
-        await restoreVersionStore(bundle.bytes, memStore)
+        const { root: storeRoot } = await restoreVersionStore(
+            bundle.bytes,
+            memStore
+        )
 
         const versionStore: VersionStore = await versionStoreFactory({
-            storeRoot: versionStoreRoot,
+            storeRoot: storeRoot,
             chunk,
             linkCodec,
             valueCodec,

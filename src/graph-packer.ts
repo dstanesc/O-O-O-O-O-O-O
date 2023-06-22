@@ -53,8 +53,18 @@ interface GraphPacker {
 
     /**
      * Packs a complete graph version into a single block.
+     * @deprecated
      */
     packGraph: (versionRoot: Link, fromStore: BlockStore) => Promise<Block>
+
+    /**
+     * Packs a complete graph version into a single block.
+     */
+    packGraphVersion: (
+        versionRoot: Link,
+        fromStore: BlockStore
+    ) => Promise<Block>
+
     /**
      * Packs the commit results into a single block.
      */
@@ -94,8 +104,18 @@ interface GraphPacker {
 
     /**
      * Unpacks and restores packed graph data into a block store.
+     * @deprecated
      */
     restore: (
+        pack: Uint8Array,
+        intoStore: BlockStore
+    ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
+
+    /**
+     * Restores a packed graph version into a block store.
+     * @see packGraphVersion
+     */
+    restoreGraphVersion: (
         pack: Uint8Array,
         intoStore: BlockStore
     ) => Promise<{ root: Link; index: RootIndex; blocks: Block[] }>
@@ -438,6 +458,13 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         const bytes = writer.close()
         const cid = await linkCodec.encode(bytes)
         return { cid, bytes }
+    }
+
+    const packGraphVersion = async (
+        versionRoot: Link,
+        fromStore: BlockStore
+    ): Promise<Block> => {
+        return await packGraph(versionRoot, fromStore)
     }
 
     const packGraph = async (
@@ -908,6 +935,17 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         return { root, index, blocks }
     }
 
+    const restoreGraphVersion = async (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ): Promise<{
+        root: Link
+        index: RootIndex
+        blocks: Block[]
+    }> => {
+        return await restore(packBytes, intoStore)
+    }
+
     const restoreSingleIndex = async (
         packBytes: Uint8Array,
         intoStore: BlockStore
@@ -1016,11 +1054,13 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         extractVersionBlocks,
         packRandomBlocks,
         packVersionStore,
+        packGraphVersion,
         packGraph,
         packCommit,
         packComputed,
         packFragment,
         restore,
+        restoreGraphVersion,
         restoreSingleIndex,
         restoreRandomBlocks,
         unpack,
