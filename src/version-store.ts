@@ -341,7 +341,7 @@ const versionStoreFactory = async ({
                 otherVersion.parent.toString() === first.toString()
             ) {
                 // fast forward
-                rootSet({ root: second, index: otherIndex, parent: first })
+                versionSet({ version: otherVersion, index: otherIndex })
                 const { extractVersionBlocks } = graphPackerFactory(linkCodec)
                 const otherBlocks: Block[] = await extractVersionBlocks(
                     { root: second, index: otherIndex },
