@@ -370,8 +370,8 @@ const remoteStore: MemoryBlockStore = memoryBlockStoreFactory()
 const { root, index, blocks } = await restore(bundle.bytes, remoteStore)
 
 /**
-* Use now the restored bundle for querying
-*/
+ * Use now the restored bundle for querying
+ */
 const g: ProtoGremlin = protoGremlinFactory({
     chunk,
     linkCodec,
@@ -381,7 +381,6 @@ const g: ProtoGremlin = protoGremlinFactory({
 }).g()
 //...
 ```
-
 
 # Lists
 
@@ -484,6 +483,54 @@ const trusted = await verify({
     signature: version.details.signature,
 })
 assert.strictEqual(trusted, true)
+```
+
+# Relay Client
+
+_WIP_
+
+Provides the ability to transport graph history and graph versions to and from a [graph relay](https://github.com/dstanesc/O-O-O-O-O-O-O-R). The history publishing includes relay-side support for merge. There are 2 client categories:
+
+_Plumbing client_, providing fine granular APIs for history and graph bundles publish and retrieval. Bundling multiple blocks together is helping to reduce the number of round-trips between the client and the relay. Following example is using the _plumbing_ client to push an individual version of the graph to a relay.
+
+```ts
+const { packGraphVersion } = graphPackerFactory(linkCodec)
+// ...
+const graph = new Graph(versionStore, graphStore)
+const tx = graph.tx()
+await tx.start()
+// ...
+const { root } = await tx.commit({
+    comment: 'First draft',
+    tags: ['v0.0.1'],
+})
+const graphVersionBundle: Block = await packGraphVersion(root, blockStore)
+const relayClient: RelayClientPlumbing = relayClientPlumbingFactory({
+    baseURL: 'http://localhost:3000',
+})
+const responseGraphVersionPush = await relayClient.graphPush(
+    graphVersionBundle.bytes
+)
+```
+
+_Basic client_, providing a simple API for complete graph publishing and retrieval. Following example is using the _basic client_ to retrieve a complete graph from the relay.
+
+```ts
+const relayClient: RelayClientBasic = relayClientBasicFactory(
+    {
+        chunk,
+        chunkSize,
+        linkCodec,
+        valueCodec,
+        blockStore,
+    },
+    {
+        baseURL: 'http://localhost:3000',
+    }
+)
+const { versionStore, graphStore, graph } = await relayClient.pull(
+    '4f67e4c6-9a9d-4e87-bf29-af0d35a19bdc'
+)
 ```
 
 # Multiple APIs
