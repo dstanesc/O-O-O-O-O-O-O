@@ -1,7 +1,7 @@
 {
     "name": "@dstanesc/o-o-o-o-o-o-o",
     "description": "O-O-O-O-O-O-O is a collection of content addressed persistent data structures",
-    "version": "0.0.14",
+    "version": "0.0.15",
     "homepage": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "repository": "https://github.com/dstanesc/O-O-O-O-O-O-O",
     "license": "(Apache-2.0 AND MIT)",
@@ -40,7 +40,7 @@
     },
     "devDependencies": {
         "@dstanesc/ipfs-block-store": "^0.0.9",
-        "@dstanesc/o-o-o-o-o-o-o-r": "^0.0.3",
+        "@dstanesc/o-o-o-o-o-o-o-r": "^0.0.4",
         "@dstanesc/s3-block-store": "^0.0.3",
         "@dstanesc/wasm-chunking-fastcdc-node": "^0.1.1",
         "@types/jest": "^28.1.5",
