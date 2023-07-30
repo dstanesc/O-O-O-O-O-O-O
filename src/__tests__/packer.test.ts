@@ -294,7 +294,7 @@ describe('Graph packer', function () {
 
     test('pack and restore single commit', async () => {
         const stream = await getStream(
-            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+            '/dstanesc/bibleapi-bibles-json/legacy/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)

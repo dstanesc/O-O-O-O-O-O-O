@@ -55,7 +55,7 @@ enum IndexTypes {
 describe('e2e ', function () {
     test('full bible, 7MB json, no index, load and navigate', async () => {
         const stream = await getStream(
-            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+            '/dstanesc/bibleapi-bibles-json/legacy/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
@@ -207,7 +207,7 @@ describe('e2e ', function () {
 
     test('full bible, 7MB json, no index, query first level', async () => {
         const stream = await getStream(
-            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+            '/dstanesc/bibleapi-bibles-json/legacy/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
@@ -346,7 +346,7 @@ describe('e2e ', function () {
 
     test('full bible, 7MB json, KeyTypes.ID indexed, load and navigate', async () => {
         const stream = await getStream(
-            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+            '/dstanesc/bibleapi-bibles-json/legacy/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
@@ -474,7 +474,7 @@ describe('e2e ', function () {
 
     test('full bible, 7MB json, no index, template based retrieval', async () => {
         const stream = await getStream(
-            '/bibleapi/bibleapi-bibles-json/master/kjv.json'
+            '/dstanesc/bibleapi-bibles-json/legacy/kjv.json'
         )
         const str = (await stream.text()).trim()
         const lines = str.split(/\r?\n/g)
