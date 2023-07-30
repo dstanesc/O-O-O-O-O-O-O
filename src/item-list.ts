@@ -2,6 +2,7 @@ import { BlockStore } from './block-store'
 import { LinkCodec, ValueCodec } from './codecs'
 import { Graph, Tx } from './graph'
 import { GraphStore, graphStoreFactory } from './graph-store'
+import { MergePolicyEnum, merge } from './merge'
 import { OFFSET_INCREMENTS } from './serde'
 import {
     Version,
@@ -168,6 +169,44 @@ const readonlyItemList = async ({
     return readonlyItemList
 }
 
+const mergeItemLists = async (
+    {
+        baseRoot,
+        baseStore,
+        currentRoot,
+        currentStore,
+        otherRoot,
+        otherStore,
+    }: {
+        baseRoot: Link
+        baseStore: BlockStore
+        currentRoot: Link
+        currentStore: BlockStore
+        otherRoot: Link
+        otherStore: BlockStore
+    },
+    chunk: (buffer: Uint8Array) => Uint32Array,
+    linkCodec: LinkCodec,
+    valueCodec: ValueCodec
+): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> => {
+    const { root, index, blocks } = await merge(
+        {
+            baseRoot,
+            baseStore,
+            currentRoot,
+            currentStore,
+            otherRoot,
+            otherStore,
+        },
+        MergePolicyEnum.MultiValueRegistry,
+        chunk,
+        linkCodec,
+        valueCodec
+    )
+
+    return { root, index, blocks }
+}
+
 export {
     ItemList,
     ItemValue,
@@ -176,4 +215,5 @@ export {
     ItemListTransaction,
     itemListFactory,
     readonlyItemList,
+    mergeItemLists,
 }
