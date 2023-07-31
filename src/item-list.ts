@@ -4,6 +4,7 @@ import { Graph, Tx } from './graph'
 import { GraphStore, graphStoreFactory } from './graph-store'
 import { MergePolicyEnum, merge } from './merge'
 import { OFFSET_INCREMENTS } from './serde'
+import { Signer } from './trust'
 import {
     Version,
     RootIndex,
@@ -127,11 +128,13 @@ class ItemListTransaction {
     async commit({
         comment,
         tags,
+        signer,
     }: {
         comment?: Comment
         tags?: Tag[]
+        signer?: Signer
     }): Promise<{ root: Link; index: RootIndex; blocks: Block[] }> {
-        return this.tx.commit({ comment, tags })
+        return await this.tx.commit({ comment, tags, signer })
     }
 }
 

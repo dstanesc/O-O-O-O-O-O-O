@@ -22,7 +22,7 @@ import {
 } from '../item-list'
 
 describe('revise and merge item list', function () {
-    test('simple itemxmx', async () => {
+    test('simple', async () => {
         const { chunk } = chunkerFactory(512, compute_chunks)
         const linkCodec: LinkCodec = linkCodecFactory()
         const valueCodec: ValueCodec = valueCodecFactory()
