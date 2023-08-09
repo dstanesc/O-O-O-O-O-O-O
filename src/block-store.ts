@@ -27,7 +27,7 @@ const memoryBlockStoreFactory = (): MemoryBlockStore => {
     }
     const get = async (cid: any): Promise<Uint8Array> => {
         const bytes = blocks[cid.toString()]
-        if (!bytes === undefined)
+        if (bytes === undefined)
             throw new Error('Block Not found for ' + cid.toString())
         readCounter++
         return bytes
