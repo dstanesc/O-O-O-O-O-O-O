@@ -1,3 +1,4 @@
+import { blockIndexFactory } from './block-index'
 import {
     BlockStore,
     MemoryBlockStore,
@@ -7,9 +8,14 @@ import { LinkCodec, ValueCodec } from './codecs'
 import { Graph } from './graph'
 import { graphPackerFactory } from './graph-packer'
 import { GraphStore, graphStoreFactory } from './graph-store'
-import { Block, Link, Version } from './types'
+import { Block, ContentDiff, Link, Version } from './types'
 import { VersionStore, versionStoreFactory } from './version-store'
-import axios, { AxiosInstance, AxiosResponse, CreateAxiosDefaults } from 'axios'
+import axios, {
+    AxiosError,
+    AxiosInstance,
+    AxiosResponse,
+    CreateAxiosDefaults,
+} from 'axios'
 
 interface RelayClientPlumbing {
     storePush(
@@ -23,6 +29,8 @@ interface RelayClientPlumbing {
     storeResolve(versionStoreId: string): Promise<string | undefined>
     graphPush(bytes: Uint8Array): Promise<PlumbingGraphPushResponse>
     graphPull(versionRoot: string): Promise<Uint8Array | undefined>
+    indexPull(versionRoot: string): Promise<Uint8Array | undefined>
+    blocksPush(bytes: Uint8Array): Promise<PlumbingBlocksPushResponse>
 }
 
 type PlumbingStorePushResponse = {
@@ -34,16 +42,17 @@ type PlumbingGraphPushResponse = {
     versionRoot: string
 }
 
+type PlumbingBlocksPushResponse = {
+    blockCount: number
+}
+
 type BasicPushResponse = {
     storeRoot: Link
     versionRoot: Link
-    versionsPushed: {
-        versionRoot: Link
-    }[]
 }
 
 interface RelayClientBasic {
-    push(versionStoreRoot: Link): Promise<BasicPushResponse>
+    push(versionStoreRoot: Link, versionRoot?: Link): Promise<BasicPushResponse>
     pull(
         versionStoreId: string
     ): Promise<
@@ -59,12 +68,14 @@ const relayClientBasicFactory = (
         linkCodec,
         valueCodec,
         blockStore,
+        incremental = false,
     }: {
         chunk: (buffer: Uint8Array) => Uint32Array
         chunkSize: number
         linkCodec: LinkCodec
         valueCodec: ValueCodec
         blockStore: BlockStore
+        incremental?: boolean
     },
     config: CreateAxiosDefaults<any>
 ): RelayClientBasic => {
@@ -73,60 +84,164 @@ const relayClientBasicFactory = (
         packVersionStore,
         restoreSingleIndex: restoreVersionStore,
         packGraphVersion,
+        packRootIndex,
+        packRandomBlocks,
         restoreGraphVersion,
+        restoreRootIndex,
     } = graphPackerFactory(linkCodec)
 
     const push = async (
         versionStoreRoot: Link,
         versionRoot?: Link
     ): Promise<BasicPushResponse> => {
-        let versionRoots: Link[]
-        if (versionRoot === undefined) {
-            const versionStore: VersionStore = await versionStoreFactory({
-                storeRoot: versionStoreRoot,
-                chunk,
-                linkCodec,
-                valueCodec,
-                blockStore,
-            })
-            versionRoots = versionStore.log().map((version) => version.root)
-        } else {
-            versionRoots = [versionRoot]
-        }
-
-        const graphVersionBundles: Block[] = []
-        for (const root of versionRoots) {
-            const graphVersionBundle: Block = await packGraphVersion(
-                root,
-                blockStore
-            )
-            graphVersionBundles.push(graphVersionBundle)
-        }
-
-        const graphPushResponses: { versionRoot: string }[] = []
-        for (const bundle of graphVersionBundles) {
-            const response: { versionRoot: string } = await plumbing.graphPush(
-                bundle.bytes
-            )
-            graphPushResponses.push(response)
-        }
-
-        const bundle: Block = await packVersionStore(
+        let localVersionRoot: Link
+        const localVersionStore: VersionStore = await versionStoreFactory({
+            storeRoot: versionStoreRoot,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore,
+        })
+        const localVersionStoreBundle: Block = await packVersionStore(
             versionStoreRoot,
             blockStore,
             chunk,
             valueCodec
         )
+        if (versionRoot === undefined) {
+            localVersionRoot = localVersionStore.currentRoot()
+        } else {
+            localVersionRoot = versionRoot
+        }
+        const graphVersionBundles: Block[] = []
+        let remoteVersionStoreBytes: Uint8Array | undefined
+        if (incremental) {
+            try {
+                remoteVersionStoreBytes = await plumbing.storePull(
+                    chunkSize,
+                    localVersionStore.id()
+                )
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const axiosError: AxiosError = error
+                    if (axiosError.response?.status !== 404) {
+                        throw error
+                    }
+                }
+            }
+        }
+        if (remoteVersionStoreBytes !== undefined) {
+            const diffStore: MemoryBlockStore = memoryBlockStoreFactory()
+            const { root: remoteVersionStoreRoot } = await restoreVersionStore(
+                remoteVersionStoreBytes,
+                diffStore
+            )
+            const remoteVersionStore: VersionStore = await versionStoreFactory({
+                storeRoot: remoteVersionStoreRoot,
+                chunk,
+                linkCodec,
+                valueCodec,
+                blockStore: diffStore,
+            })
+            const remoteVersionRoot: Link = remoteVersionStore.currentRoot()
+            const remoteVersionRoots: Link[] = remoteVersionStore
+                .log()
+                .map((version) => version.root)
 
-        const storePushResponse: { storeRoot: string; versionRoot: string } =
-            await plumbing.storePush(chunkSize, bundle.bytes)
+            if (
+                remoteVersionRoots
+                    .map((root) => linkCodec.encodeString(root))
+                    .includes(linkCodec.encodeString(localVersionRoot))
+            ) {
+                return {
+                    storeRoot: versionStoreRoot,
+                    versionRoot: localVersionRoot,
+                }
+            } else {
+                const remoteRootIndexBytes = await plumbing.indexPull(
+                    remoteVersionRoot.toString()
+                )
+                const { blocks: remoteRootIndexBlocks } =
+                    await restoreRootIndex(remoteRootIndexBytes, diffStore)
+                const localRootIndexBundle: Block = await packRootIndex(
+                    localVersionRoot,
+                    blockStore
+                )
+                const { blocks: localRootIndexBlocks } = await restoreRootIndex(
+                    localRootIndexBundle.bytes,
+                    diffStore
+                )
+                const selectedBlocks: Block[] = []
+                for (const block of localRootIndexBlocks) {
+                    const linkString = linkCodec.encodeString(block.cid)
+                    if (
+                        !remoteRootIndexBlocks
+                            .map((block) => linkCodec.encodeString(block.cid))
+                            .includes(linkString)
+                    ) {
+                        selectedBlocks.push(block)
+                    }
+                }
+                const blockIndexBuilder = blockIndexFactory({
+                    linkCodec,
+                    blockStore: diffStore,
+                })
+                const contentDiff: ContentDiff =
+                    await blockIndexBuilder.diffRootIndex({
+                        currentRoot: remoteVersionRoot,
+                        otherRoot: localVersionRoot,
+                    })
+                for (const link of contentDiff.added) {
+                    const bytes = await blockStore.get(link)
+                    const block: Block = { cid: link, bytes }
+                    selectedBlocks.push(block)
+                }
+                const diffBundle = await packRandomBlocks(selectedBlocks)
+                const blocksPushResponse: { blockCount: number } =
+                    await plumbing.blocksPush(diffBundle.bytes)
+                if (blocksPushResponse.blockCount !== selectedBlocks.length) {
+                    throw new Error(
+                        `Failed to push all blocks pushed: ${selectedBlocks.length}, confirmed: ${blocksPushResponse.blockCount}`
+                    )
+                }
+                const storePushResponse: {
+                    storeRoot: string
+                    versionRoot: string
+                } = await plumbing.storePush(
+                    chunkSize,
+                    localVersionStoreBundle.bytes
+                )
+                return {
+                    storeRoot: linkCodec.parseString(
+                        storePushResponse.storeRoot
+                    ),
+                    versionRoot: linkCodec.parseString(
+                        storePushResponse.versionRoot
+                    ),
+                }
+            }
+        } else {
+            const graphVersionBundle: Block = await packGraphVersion(
+                localVersionRoot,
+                blockStore
+            )
+            const graphPushResponse: { versionRoot: string } =
+                await plumbing.graphPush(graphVersionBundle.bytes)
 
-        return {
-            storeRoot: linkCodec.parseString(storePushResponse.storeRoot),
-            versionRoot: linkCodec.parseString(storePushResponse.versionRoot),
-            versionsPushed: graphPushResponses.map((response) => ({
-                versionRoot: linkCodec.parseString(response.versionRoot),
-            })),
+            const storePushResponse: {
+                storeRoot: string
+                versionRoot: string
+            } = await plumbing.storePush(
+                chunkSize,
+                localVersionStoreBundle.bytes
+            )
+
+            return {
+                storeRoot: linkCodec.parseString(storePushResponse.storeRoot),
+                versionRoot: linkCodec.parseString(
+                    storePushResponse.versionRoot
+                ),
+            }
         }
     }
 
@@ -271,7 +386,44 @@ const relayClientPlumbingFactory = (
         } else return undefined
     }
 
-    return { storePush, storePull, storeResolve, graphPush, graphPull }
+    const indexPull = async (
+        versionRoot: string
+    ): Promise<Uint8Array | undefined> => {
+        const response: AxiosResponse<ArrayBuffer> = await httpClient.get(
+            '/graph/index/pull',
+            {
+                responseType: 'arraybuffer',
+                params: {
+                    id: versionRoot,
+                },
+            }
+        )
+        if (response.data) {
+            const bytes = new Uint8Array(response.data)
+            return bytes
+        } else return undefined
+    }
+
+    const blocksPush = async (
+        bytes: Uint8Array
+    ): Promise<PlumbingBlocksPushResponse> => {
+        const response = await httpClient.put('/blocks/push', bytes.buffer, {
+            headers: {
+                'Content-Type': 'application/octet-stream',
+            },
+        })
+        return response.data
+    }
+
+    return {
+        storePush,
+        storePull,
+        storeResolve,
+        graphPush,
+        graphPull,
+        indexPull,
+        blocksPush,
+    }
 }
 
 export {

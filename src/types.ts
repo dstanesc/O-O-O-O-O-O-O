@@ -123,11 +123,25 @@ type RootStruct = {
 }
 
 type RootIndex = RootStruct & {
-    vertexIndex: any
-    edgeIndex: any
-    propIndex: any
-    valueIndex: any
-    indexIndex: any
+    vertexIndex: BlockIndex
+    edgeIndex: BlockIndex
+    propIndex: BlockIndex
+    valueIndex: BlockIndex
+    indexIndex: BlockIndex
+}
+
+type BlockIndex = {
+    indexStruct: {
+        startOffsets: Map<number, any>
+        indexSize: number
+        byteArraySize: number
+    }
+    indexBuffer: Uint8Array
+}
+
+type ContentDiff = {
+    added: Link[]
+    removed: Link[]
 }
 
 type Comment = any
@@ -189,6 +203,8 @@ export {
     Block,
     RootStruct,
     RootIndex,
+    BlockIndex,
+    ContentDiff,
     Version,
     VersionDetails,
     Comment,

@@ -24,9 +24,12 @@ import {
     Tag,
     Block,
     Version,
+    ContentDiff,
+    RootIndex,
 } from '../types'
 import { VersionStore, versionStoreFactory } from '../version-store'
 import { graphPackerFactory } from '../graph-packer'
+import { blockIndexFactory } from '../block-index'
 
 /**
  * Some proto-schema
@@ -49,21 +52,26 @@ enum PropTypes {
 enum KeyTypes {
     NAME = 1,
     CONTENT = 2,
+    FILL = 3,
 }
 
 const { chunk } = chunkerFactory(512, compute_chunks)
 const linkCodec: LinkCodec = linkCodecFactory()
 const valueCodec: ValueCodec = valueCodecFactory()
+const blockStore1: MemoryBlockStore = memoryBlockStoreFactory()
 const {
     packVersionStore,
     restoreSingleIndex: restoreVersionStore,
     packGraphVersion,
     restoreGraphVersion,
+    packRootIndex,
+    restoreRootIndex,
+    packRandomBlocks,
+    restoreRandomBlocks,
 } = graphPackerFactory(linkCodec)
-const blockStore1: MemoryBlockStore = memoryBlockStoreFactory()
 
-describe('Version pack and restore', function () {
-    test('edit, bundle, restore, edit, bundle, restore, query', async () => {
+describe('Block index', function () {
+    test('diffRootIndex returns all relevant blocks for incremental bundles', async () => {
         const versionStore: VersionStore = await versionStoreFactory({
             chunk,
             linkCodec,
@@ -104,6 +112,16 @@ describe('Version pack and restore', function () {
             'hello world from v3',
             PropTypes.DATA
         )
+        // force generating blocks
+        for (let i = 0; i < 100; i++) {
+            await tx.addVertexProp(
+                v3,
+                KeyTypes.FILL,
+                new Uint8Array(1024),
+                PropTypes.DATA
+            )
+        }
+
         const { root: original } = await tx.commit({})
 
         /**
@@ -122,10 +140,20 @@ describe('Version pack and restore', function () {
             original,
             blockStore1
         )
+
+        /**
+         * Pack original root index
+         */
+
+        const rootIndexBundle: Block = await packRootIndex(
+            original,
+            blockStore1
+        )
+
         /**
          * Empty block store
          */
-        const memoryStore: BlockStore = memoryBlockStoreFactory()
+        const memoryStore: MemoryBlockStore = memoryBlockStoreFactory()
 
         /**
          * Restore version store into the empty block store
@@ -197,9 +225,14 @@ describe('Version pack and restore', function () {
         )
 
         /**
+         * Pack newest root index
+         */
+        const rootIndexBundle1: Block = await packRootIndex(first, memoryStore)
+
+        /**
          * Empty block store
          */
-        const memoryStore1: BlockStore = memoryBlockStoreFactory()
+        const memoryStore1: MemoryBlockStore = memoryBlockStoreFactory()
 
         /**
          * Restore newest version store into the empty block store
@@ -238,6 +271,157 @@ describe('Version pack and restore', function () {
         assert.strictEqual(vr[0].value, 'nested-folder')
         assert.strictEqual(vr[1].value, 'nested-file')
         assert.strictEqual(vr[2].value, 'nested-file-user-1')
+
+        const diffStore: MemoryBlockStore = memoryBlockStoreFactory()
+
+        /**
+         * Restore original root index into the empty block store
+         */
+        const { root: originalRootLink } = await restoreRootIndex(
+            rootIndexBundle.bytes,
+            diffStore
+        )
+
+        assert.strictEqual(
+            originalRootLink.toString(),
+            original.toString(),
+            'original root link properly unpacked'
+        )
+
+        /**
+         * Restore newest root index into the empty block store
+         */
+        const { root: newestRootLink } = await restoreRootIndex(
+            rootIndexBundle1.bytes,
+            diffStore
+        )
+
+        assert.strictEqual(
+            newestRootLink.toString(),
+            first.toString(),
+            'newest root link properly unpacked'
+        )
+
+        const blockIndexBuilder = blockIndexFactory({
+            linkCodec,
+            blockStore: diffStore,
+        })
+
+        // Compute content diff based on the restored root indices
+        const contentDiff: ContentDiff = await blockIndexBuilder.diffRootIndex({
+            currentRoot: originalRootLink,
+            otherRoot: newestRootLink,
+        })
+
+        assert.equal(contentDiff.added.length, 5)
+
+        assert.strictEqual(
+            linkCodec.encodeString(contentDiff.added[0]),
+            'bafkreihtrcfbwpb2jytsj7lfk7mf4pu64peipthclvtgaayfqzuwoqhnk4'
+        )
+
+        assert.strictEqual(
+            linkCodec.encodeString(contentDiff.added[1]),
+            'bafkreic7bnjlkbyiieuuewdfhhleehcye2fhycg3bcuwwnbphdtvlpmyoa'
+        )
+
+        assert.strictEqual(
+            linkCodec.encodeString(contentDiff.added[2]),
+            'bafkreiftybfklunci2s7z6z73jyn2mwig7za32owsvlssxmwcitbbzt63e'
+        )
+
+        assert.strictEqual(
+            linkCodec.encodeString(contentDiff.added[3]),
+            'bafkreif4bd6365zrkbecbib6prfthbs4lpxayteyjv56rsrax7nyhtxgze'
+        )
+
+        assert.strictEqual(
+            linkCodec.encodeString(contentDiff.added[4]),
+            'bafkreiht6mcqgekpczcylrp5f4uv6hruz6b5cdto5iqiremkjyoxlkwhpa'
+        )
+
+        const blocks: Block[] = []
+        for (const cid of contentDiff.added) {
+            const bytes = await memoryStore1.get(cid)
+            const block: Block = { cid, bytes }
+            blocks.push(block)
+        }
+
+        const diffBundle = await packRandomBlocks(blocks)
+
+        // create a fresh block store
+        const incrementalStore: MemoryBlockStore = memoryBlockStoreFactory()
+        // containing original blocks
+        await memoryStore.push(incrementalStore)
+        // and the new version store
+        await restoreVersionStore(versionStoreBundle1.bytes, incrementalStore)
+        // and just the missing/diff blocks
+        await restoreRandomBlocks(diffBundle.bytes, incrementalStore)
+
+        // the blocks from the incremental store should be sufficient for resolving the query
+        const versionStore3: VersionStore = await versionStoreFactory({
+            storeRoot: storeRoot1,
+            versionRoot: versionRoot1,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: incrementalStore,
+        })
+        const graphStore3 = graphStoreFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: incrementalStore,
+        })
+        const g3 = new Graph(versionStore3, graphStore3)
+        const incr = await query(g3)
+        assert.strictEqual(incr.length, 3)
+        assert.strictEqual(incr[0].value, 'nested-folder')
+        assert.strictEqual(incr[1].value, 'nested-file')
+        assert.strictEqual(incr[2].value, 'nested-file-user-1')
+
+        // incremental store should contain all the blocks associated with the root index
+        const { index: lastIndex } = await blockIndexBuilder.buildRootIndex(
+            newestRootLink
+        )
+        const {
+            vertexIndex: lastVertexIndex,
+            edgeIndex: lastEdgeIndex,
+            propIndex: lastPropIndex,
+            valueIndex: lastValueIndex,
+            indexIndex: lastIndexIndex,
+        } = lastIndex
+
+        const vertexLinks = Array.from(
+            lastVertexIndex.indexStruct.startOffsets.values()
+        )
+        const edgeLinks = Array.from(
+            lastEdgeIndex.indexStruct.startOffsets.values()
+        )
+        const propLinks = Array.from(
+            lastPropIndex.indexStruct.startOffsets.values()
+        )
+        const valueLinks = Array.from(
+            lastValueIndex.indexStruct.startOffsets.values()
+        )
+        const indexLinks = Array.from(
+            lastIndexIndex.indexStruct.startOffsets.values()
+        )
+
+        const allLinks = [
+            ...vertexLinks,
+            ...edgeLinks,
+            ...propLinks,
+            ...valueLinks,
+            ...indexLinks,
+        ]
+
+        assert.strictEqual(allLinks.length, 113)
+
+        for (const link of allLinks) {
+            const bytes = await incrementalStore.get(link)
+            assert.ok(bytes !== undefined, 'block exists in incremental store')
+        }
     })
 })
 

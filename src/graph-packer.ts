@@ -66,6 +66,11 @@ interface GraphPacker {
     ) => Promise<Block>
 
     /**
+     * Packs a complete root index into a single block.
+     */
+    packRootIndex: (versionRoot: Link, fromStore: BlockStore) => Promise<Block>
+
+    /**
      * Packs the commit results into a single block.
      */
     packCommit: ({
@@ -133,6 +138,15 @@ interface GraphPacker {
             indexSize: number
             byteArraySize: number
         }
+        blocks: Block[]
+    }>
+
+    restoreRootIndex: (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ) => Promise<{
+        root: Link
+        index: RootIndex
         blocks: Block[]
     }>
 
@@ -514,6 +528,43 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
             const { startOffsets } = idx.indexStruct
             await writeMany(startOffsets.values(), fromStore, writer)
         }
+        const bytes = writer.close()
+        const cid = await linkCodec.encode(bytes)
+        return { cid, bytes }
+    }
+
+    const packRootIndex = async (
+        versionRoot: Link,
+        fromStore: BlockStore
+    ): Promise<Block> => {
+        const { buildRootIndex } = blockIndexFactory({
+            linkCodec,
+            blockStore: fromStore,
+        })
+        const { index } = await buildRootIndex(versionRoot)
+        const {
+            vertexIndex,
+            edgeIndex,
+            propIndex,
+            valueIndex,
+            indexIndex,
+            vertexRoot,
+            edgeRoot,
+            propRoot,
+            valueRoot,
+            indexRoot,
+        } = index
+        const roots = [vertexRoot, edgeRoot, propRoot, valueRoot, indexRoot]
+        const carRoots = [CID.asCID(versionRoot)]
+        let bufferSize = CarBufferWriter.headerLength({ roots: carRoots })
+        bufferSize += await computeSize([versionRoot], fromStore)
+        bufferSize += await computeSize(roots, fromStore)
+        const buffer = new Uint8Array(bufferSize)
+        const writer: Writer = CarBufferWriter.createWriter(buffer, {
+            roots: carRoots,
+        })
+        await writeMany(carRoots, fromStore, writer)
+        await writeMany(roots, fromStore, writer)
         const bytes = writer.close()
         const cid = await linkCodec.encode(bytes)
         return { cid, bytes }
@@ -974,6 +1025,30 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         return { root, index: indexStruct, blocks }
     }
 
+    const restoreRootIndex = async (
+        packBytes: Uint8Array,
+        intoStore: BlockStore
+    ): Promise<{
+        root: Link
+        index: RootIndex
+        blocks: Block[]
+    }> => {
+        const reader = await CarReader.fromBytes(packBytes)
+        const [root] = await reader.getRoots()
+        const blocks: Block[] = []
+        for await (const { cid, bytes } of reader.blocks()) {
+            blocks.push({ cid, bytes })
+            await intoStore.put({ cid, bytes })
+        }
+        const { buildRootIndex } = blockIndexFactory({
+            linkCodec,
+            blockStore: intoStore,
+        })
+        const { index } = await buildRootIndex(root)
+
+        return { root, index, blocks }
+    }
+
     const packRandomBlocks = async (blocks: Block[]): Promise<Block> => {
         let bufferSize = 0
         bufferSize += CarBufferWriter.headerLength({ roots: [] })
@@ -1055,6 +1130,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         packRandomBlocks,
         packVersionStore,
         packGraphVersion,
+        packRootIndex,
         packGraph,
         packCommit,
         packComputed,
@@ -1062,6 +1138,7 @@ const graphPackerFactory = (linkCodec: LinkCodec): GraphPacker => {
         restore,
         restoreGraphVersion,
         restoreSingleIndex,
+        restoreRootIndex,
         restoreRandomBlocks,
         unpack,
     }
