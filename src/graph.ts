@@ -31,8 +31,6 @@ import { TraversalVisitor, traverseVertices } from './depth-first'
 import { IndexStore } from './index-store'
 import { PropPredicate } from './navigate'
 import { Signer } from './trust'
-import { graphPackerFactory } from './graph-packer'
-import { VersionString } from 'aws-sdk/clients/glue'
 
 interface ElementAccessor {
     getVertex: (ref: VertexRef) => Promise<Vertex>
@@ -552,7 +550,7 @@ class Graph implements ElementAccessor {
 
     /**
      * Pack a graph fragment
-     * 
+     *
      * @param vertexOffsetStart - the offset of the first vertex
      * @param vertexCount - the number of vertices, counting from the first vertex
      * @param graphDepth - the depth of the fragment
@@ -987,6 +985,8 @@ class Tx implements ElementAccessor {
         if (signer !== undefined) {
             const signature = await signer.sign(root)
             versionDetails.signature = signature
+            const publicKey = await signer.exportPublicKey()
+            versionDetails.author = publicKey
         }
 
         const version: Version = {

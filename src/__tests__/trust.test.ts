@@ -70,7 +70,7 @@ describe('Trust management', function () {
          * Sign the root while committing
          */
 
-        const signer: Signer = signerFactory({ subtle, privateKey })
+        const signer: Signer = signerFactory({ subtle, privateKey, publicKey })
 
         const { root } = await tx.commit({
             comment: 'First draft',
@@ -97,7 +97,7 @@ describe('Trust management', function () {
             'signature',
             base64.fromByteArray(version.details.signature)
         )
-
+        // verify original key
         const trusted = await verify({
             subtle,
             publicKey,
@@ -107,9 +107,29 @@ describe('Trust management', function () {
 
         assert.strictEqual(trusted, true)
 
-        /**
-         * Verify that a random root is not trusted
-         */
+        // verify stored key
+        const publicKeyJWK = JSON.parse(version.details.author)
+
+        console.log('publicKeyJWK', publicKeyJWK)
+
+        const publicKey2 = await subtle.importKey(
+            'jwk',
+            publicKeyJWK,
+            { name: 'RSA-PSS', hash: 'SHA-256' },
+            true,
+            ['verify']
+        )
+
+        const trusted2 = await verify({
+            subtle,
+            publicKey: publicKey2,
+            root: version.root,
+            signature: version.details.signature,
+        })
+
+        assert.strictEqual(trusted2, true)
+
+        // Verify that a random root is not trusted
         const untrusted = await verify({
             subtle,
             publicKey,

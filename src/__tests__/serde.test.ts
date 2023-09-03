@@ -172,6 +172,15 @@ describe('Serde validation with', function () {
             },
         }
 
+        const publicKeyJWK = {
+            key_ops: ['verify'],
+            ext: true,
+            kty: 'RSA',
+            n: 't8iYfsaJOvQPYdbd7rhKf5g8ta8un4LUnwCgjfDcgQbQWxV6pEwh40Rh2rTZCBrTr4S00LsNDwhGP4lb4bpATPvmtGFxeBPig6dXmjJr37rVB1w236zcl8AsrNX2qHe3uVeZVvg6ZXhTjV7nM_MurOHxDbRzWSIc2xRqnrPIey6ZA5xAe_ay3Gt82QC_d4x4jU9vt6yQgoUv9qteJHH-7eFNk0KlzZMO9KygYnwCKBRxMIanil6KCb44MNKuqWlxWmxaD7Oq7rnTvaIRWtDIfRdEhRUU4SdNS-pMEJjxlU1xs_Ofbn4i2RjZI7ebhMDuuNSJ6YA5mTTSINf-PjNdpQ',
+            e: 'AQAB',
+            alg: 'PS256',
+        }
+
         const v2: Version = {
             root: CID.parse(
                 'bafkreicklvs2aaeqfvs6f2pgcki2gont35chka2loq7mlah7yu4tj6bsvy'
@@ -186,7 +195,7 @@ describe('Serde validation with', function () {
                 comment: 'Second commit',
                 tags: ['tag2'],
                 timestamp: 123456789,
-                author: 'John Doe',
+                author: JSON.stringify(publicKeyJWK),
                 signature: base64.toByteArray(
                     'Y/abSmVYftmvvBuSkVL6S9U8ilvRrSqLJZ7pl2P1qJP/WocJUFXWlZcaiEKMoImH6KNC8I4nrJVP17hUtFM88hg552sp+EBV5V6hOkViHAiZfY6f3hQzaXzozvRlHOGt/UZKKr8lbCYdncASlob/OIsMmbulXKtngnWA48BsUtP7CoKXKKkqmBl/5dvHaAgnZ6voDKssSKlrFUcrd6qOgPUN+aBSv/9DqBTNhOT+JF3MJ3HRGplt648DatCA/eLyXOJZTRtVeVbRO+bqEaLztZ+L/4X4NQoJ1kL7QmwSPAx8qDBJSVBiDtoLG5yjf+u2dILaFjgEBskwtPIJ1ETM4Q=='
                 ),
