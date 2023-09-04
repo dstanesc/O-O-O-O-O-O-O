@@ -31,6 +31,7 @@ interface RelayClientPlumbing {
     graphPull(versionRoot: string): Promise<Uint8Array | undefined>
     indexPull(versionRoot: string): Promise<Uint8Array | undefined>
     blocksPush(bytes: Uint8Array): Promise<PlumbingBlocksPushResponse>
+    blocksPull(links: string[]): Promise<Uint8Array | undefined>
 }
 
 type PlumbingStorePushResponse = {
@@ -54,7 +55,8 @@ type BasicPushResponse = {
 interface RelayClientBasic {
     push(versionStoreRoot: Link, versionRoot?: Link): Promise<BasicPushResponse>
     pull(
-        versionStoreId: string
+        versionStoreId: string,
+        localVersionStoreRoot?: Link
     ): Promise<
         | { versionStore: VersionStore; graphStore: GraphStore; graph: Graph }
         | undefined
@@ -88,6 +90,7 @@ const relayClientBasicFactory = (
         packRandomBlocks,
         restoreGraphVersion,
         restoreRootIndex,
+        restoreRandomBlocks,
     } = graphPackerFactory(linkCodec)
 
     const push = async (
@@ -159,7 +162,7 @@ const relayClientBasicFactory = (
                 }
             } else {
                 const remoteRootIndexBytes = await plumbing.indexPull(
-                    remoteVersionRoot.toString()
+                    linkCodec.encodeString(remoteVersionRoot)
                 )
                 const { blocks: remoteRootIndexBlocks } =
                     await restoreRootIndex(remoteRootIndexBytes, diffStore)
@@ -246,57 +249,271 @@ const relayClientBasicFactory = (
     }
 
     const pull = async (
-        versionStoreId: string
+        versionStoreId: string,
+        localVersionStoreRoot?: Link
     ): Promise<
         | { versionStore: VersionStore; graphStore: GraphStore; graph: Graph }
         | undefined
     > => {
-        const storeBytes = await plumbing.storePull(chunkSize, versionStoreId)
-        const memoryStore: MemoryBlockStore = memoryBlockStoreFactory()
-        const {
-            root: versionStoreRoot,
-            index: versionStoreIndex,
-            blocks: versionStoreBlocks,
-        } = await restoreVersionStore(storeBytes, memoryStore)
-        const versionStoreTransient: VersionStore = await versionStoreFactory({
-            storeRoot: versionStoreRoot,
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore: memoryStore,
-        })
-        const versions: Version[] = versionStoreTransient.log()
-        for (const version of versions) {
+        let remoteVersionStoreBytes: Uint8Array | undefined
+        if (incremental && localVersionStoreRoot !== undefined) {
             try {
-                await blockStore.get(version.root)
-            } catch (e) {
-                const graphVersionBytes = await plumbing.graphPull(
-                    version.root.toString()
+                remoteVersionStoreBytes = await plumbing.storePull(
+                    chunkSize,
+                    versionStoreId
                 )
-                if (graphVersionBytes !== undefined) {
-                    await restoreGraphVersion(graphVersionBytes, memoryStore)
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const axiosError: AxiosError = error
+                    if (axiosError.response?.status !== 404) {
+                        throw error
+                    }
                 }
             }
-        }
-        await memoryStore.push(blockStore)
-        const versionStore: VersionStore = await versionStoreFactory({
-            storeRoot: versionStoreRoot,
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-        })
-        const graphStore = graphStoreFactory({
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-        })
-        const graph = new Graph(versionStore, graphStore)
-        return {
-            versionStore,
-            graphStore,
-            graph,
+            if (remoteVersionStoreBytes !== undefined) {
+                const diffStore: MemoryBlockStore = memoryBlockStoreFactory()
+                const { root: remoteVersionStoreRoot } =
+                    await restoreVersionStore(
+                        remoteVersionStoreBytes,
+                        diffStore
+                    )
+                const remoteVersionStore: VersionStore =
+                    await versionStoreFactory({
+                        storeRoot: remoteVersionStoreRoot,
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore: diffStore,
+                    })
+                const remoteVersionRoot: Link = remoteVersionStore.currentRoot()
+                const localVersionStore: VersionStore =
+                    await versionStoreFactory({
+                        storeRoot: localVersionStoreRoot,
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore,
+                    })
+                const localVersionRoot = localVersionStore.currentRoot()
+                if (
+                    linkCodec.encodeString(localVersionRoot) !==
+                    linkCodec.encodeString(remoteVersionRoot)
+                ) {
+                    const remoteRootIndexBytes = await plumbing.indexPull(
+                        linkCodec.encodeString(remoteVersionRoot)
+                    )
+                    const { blocks: remoteRootIndexBlocks } =
+                        await restoreRootIndex(remoteRootIndexBytes, diffStore)
+                    const localRootIndexBundle: Block = await packRootIndex(
+                        localVersionRoot,
+                        blockStore
+                    )
+                    const { blocks: localRootIndexBlocks } =
+                        await restoreRootIndex(
+                            localRootIndexBundle.bytes,
+                            diffStore
+                        )
+                    const requiredBlockIdentifiers: string[] = []
+                    for (const block of remoteRootIndexBlocks) {
+                        const linkString = linkCodec.encodeString(block.cid)
+                        if (
+                            !localRootIndexBlocks
+                                .map((block) =>
+                                    linkCodec.encodeString(block.cid)
+                                )
+                                .includes(linkString)
+                        ) {
+                            requiredBlockIdentifiers.push(linkString)
+                        }
+                    }
+                    const blockIndexBuilder = blockIndexFactory({
+                        linkCodec,
+                        blockStore: diffStore,
+                    })
+
+                    const contentDiff: ContentDiff =
+                        await blockIndexBuilder.diffRootIndex({
+                            currentRoot: localVersionRoot,
+                            otherRoot: remoteVersionRoot,
+                        })
+                    for (const link of contentDiff.added) {
+                        requiredBlockIdentifiers.push(
+                            linkCodec.encodeString(link)
+                        )
+                    }
+                    const randomBlocksBundle: Uint8Array | undefined =
+                        await plumbing.blocksPull(requiredBlockIdentifiers)
+
+                    if (randomBlocksBundle !== undefined) {
+                        const selectedBlocks = await restoreRandomBlocks(
+                            randomBlocksBundle,
+                            diffStore
+                        )
+                        const localVersionStoreBundle: Block =
+                            await packVersionStore(
+                                localVersionStoreRoot,
+                                blockStore,
+                                chunk,
+                                valueCodec
+                            )
+                        const { root: storeRootExisting } =
+                            await restoreVersionStore(
+                                localVersionStoreBundle.bytes,
+                                diffStore
+                            )
+                        const graphStoreBundleExisting: Block =
+                            await packGraphVersion(localVersionRoot, blockStore)
+                        const { root: versionRootExisting } =
+                            await restoreGraphVersion(
+                                graphStoreBundleExisting.bytes,
+                                diffStore
+                            )
+                        const versionStoreExisting: VersionStore =
+                            await versionStoreFactory({
+                                storeRoot: localVersionStoreRoot,
+                                versionRoot: localVersionRoot,
+                                chunk,
+                                linkCodec,
+                                valueCodec,
+                                blockStore: diffStore,
+                            })
+                        const {
+                            root: mergedRoot,
+                            index: mergedIndex,
+                            blocks: mergedBlocks,
+                        } = await versionStoreExisting.mergeVersions(
+                            remoteVersionStore
+                        )
+                        await diffStore.push(blockStore)
+                        const mergedVersionRoot =
+                            versionStoreExisting.currentRoot()
+                        const mergedVersionStoreRoot =
+                            versionStoreExisting.versionStoreRoot()
+                        const versionStore: VersionStore =
+                            await versionStoreFactory({
+                                storeRoot: mergedVersionStoreRoot,
+                                versionRoot: mergedVersionRoot,
+                                chunk,
+                                linkCodec,
+                                valueCodec,
+                                blockStore,
+                            })
+                        const graphStore = graphStoreFactory({
+                            chunk,
+                            linkCodec,
+                            valueCodec,
+                            blockStore,
+                        })
+                        const graph = new Graph(versionStore, graphStore)
+                        return {
+                            versionStore,
+                            graphStore,
+                            graph,
+                        }
+                    } else {
+                        throw new Error(
+                            `Failed to pull selected blocks: ${JSON.stringify(
+                                requiredBlockIdentifiers
+                            )}`
+                        )
+                    }
+                } else {
+                    const versionStore = await versionStoreFactory({
+                        storeRoot: localVersionStoreRoot,
+                        versionRoot: localVersionRoot,
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore,
+                    })
+                    const graphStore = graphStoreFactory({
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore,
+                    })
+                    const graph = new Graph(versionStore, graphStore)
+                    return {
+                        versionStore,
+                        graphStore,
+                        graph,
+                    }
+                }
+            } else {
+                return undefined
+            }
+        } else {
+            try {
+                remoteVersionStoreBytes = await plumbing.storePull(
+                    chunkSize,
+                    versionStoreId
+                )
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const axiosError: AxiosError = error
+                    if (axiosError.response?.status !== 404) {
+                        throw error
+                    }
+                }
+            }
+            if (remoteVersionStoreBytes !== undefined) {
+                const transientStore: MemoryBlockStore =
+                    memoryBlockStoreFactory()
+                const {
+                    root: versionStoreRoot,
+                    index: versionStoreIndex,
+                    blocks: versionStoreBlocks,
+                } = await restoreVersionStore(
+                    remoteVersionStoreBytes,
+                    transientStore
+                )
+                const versionStoreTransient: VersionStore =
+                    await versionStoreFactory({
+                        storeRoot: versionStoreRoot,
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore: transientStore,
+                    })
+                const versions: Version[] = versionStoreTransient.log()
+                for (const version of versions) {
+                    try {
+                        await blockStore.get(version.root)
+                    } catch (e) {
+                        const graphVersionBytes = await plumbing.graphPull(
+                            version.root.toString()
+                        )
+                        if (graphVersionBytes !== undefined) {
+                            await restoreGraphVersion(
+                                graphVersionBytes,
+                                transientStore
+                            )
+                        }
+                    }
+                }
+                await transientStore.push(blockStore)
+                const versionStore: VersionStore = await versionStoreFactory({
+                    storeRoot: versionStoreRoot,
+                    chunk,
+                    linkCodec,
+                    valueCodec,
+                    blockStore,
+                })
+                const graphStore = graphStoreFactory({
+                    chunk,
+                    linkCodec,
+                    valueCodec,
+                    blockStore,
+                })
+                const graph = new Graph(versionStore, graphStore)
+                return {
+                    versionStore,
+                    graphStore,
+                    graph,
+                }
+            } else {
+                return undefined
+            }
         }
     }
 
@@ -415,6 +632,25 @@ const relayClientPlumbingFactory = (
         return response.data
     }
 
+    const blocksPull = async (
+        links: string[]
+    ): Promise<Uint8Array | undefined> => {
+        const response: AxiosResponse<ArrayBuffer> = await httpClient.put(
+            '/blocks/pull',
+            { links },
+            {
+                responseType: 'arraybuffer',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }
+        )
+        if (response.data) {
+            const bytes = new Uint8Array(response.data)
+            return bytes
+        } else return undefined
+    }
+
     return {
         storePush,
         storePull,
@@ -423,6 +659,7 @@ const relayClientPlumbingFactory = (
         graphPull,
         indexPull,
         blocksPush,
+        blocksPull,
     }
 }
 
