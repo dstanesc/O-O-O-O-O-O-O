@@ -2,7 +2,7 @@
 
 This library enables applications to author, revise, merge, navigate and share trusted, auditable and immutable graph-like data structures. Multi-local, granular and configurable persistence across technologies and providers. The individual persistence atoms (the blocks) are location independent and uniquely identified using cryptographic hashes. Each individual version of the graph data structure is location independent and uniquely identified using a cryptographic handle - _the root_.
 
-## Build
+# Build
 
 ```sh
 npm run clean
@@ -10,7 +10,7 @@ npm install
 npm run build
 ```
 
-## Test
+# Test
 
 > Note: Some of the e2e tests expect an IPFS service accessible on the local network.
 
@@ -35,11 +35,7 @@ interface BlockStore {
 }
 ```
 
-# Graphs
-
-````ts
-
-## Author
+# Author
 
 Example creating, updating in parallel and merging changes on a graph structure simulating a file system. Providing a `proto-schema` is optional.
 
@@ -120,9 +116,9 @@ const { root: original } = await tx.commit({
     comment: 'First draft',
     tags: ['v0.0.1'],
 })
-````
+```
 
-## Revise
+# Revise
 
 ```ts
 /**
@@ -260,7 +256,7 @@ assert.strictEqual(mergedFilesLww[1].value, 'nested-file')
 assert.strictEqual(mergedFilesLww[2].value, 'nested-file-user-1')
 ```
 
-## Navigate
+# Navigate
 
 Filter the data and extract vertex, edge or property information
 
@@ -297,7 +293,7 @@ const query = async (versionRoot: Link): Promise<Prop[]> => {
 }
 ```
 
-## Extract
+# Extract
 
 Extract coarser data fragments using data templates. Proto-language / syntax still under evaluation, hinting towards GraphQL.
 
@@ -331,7 +327,7 @@ for await (const result of navigateVertices(graph, [0], request)) {
 }
 ```
 
-## Bundle
+# Bundle
 
 Bundles are used to optimize data sharing. A bundle is a single large `Block` containing granular `Blocks` clustered according to flexible criteria. Currently is possible to create bundles that:
 
@@ -343,7 +339,7 @@ Bundles are used to optimize data sharing. A bundle is a single large `Block` co
 
 See tests for examples.
 
-## Trust
+# Trust
 
 Ability to certify the authenticity of the data associated with a particular version by signing the graph root. The author of the data is identified by its public key, stored as a property of the data version as JSON Web Key (JWK).
 
@@ -385,7 +381,7 @@ const trusted = await verify({
 })
 ```
 
-## Share
+# Share
 
 Share data and history via the [graph relay](https://github.com/dstanesc/O-O-O-O-O-O-O-R). There are 2 client categories:
 
@@ -394,7 +390,7 @@ Share data and history via the [graph relay](https://github.com/dstanesc/O-O-O-O
 
 See tests in the graph relay [library](https://github.com/dstanesc/O-O-O-O-O-O-O-R) for examples.
 
-## Lists
+# Lists
 
 Similar to graphs, the library can author, revise, merge and navigate lists. A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties.
 
@@ -454,10 +450,10 @@ for (let i = 0; i < range.length; i++) {
 }
 ```
 
-## Storage
+# Storage
 
 -   [Storage format](./doc/storage-format.md)
 
-## Licenses
+# Licenses
 
 Licensed under either [Apache 2.0](http://opensource.org/licenses/MIT) or [MIT](http://opensource.org/licenses/MIT) at your option.
