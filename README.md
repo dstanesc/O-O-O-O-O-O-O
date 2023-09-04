@@ -1,14 +1,32 @@
-# O-O-O-O-O-O-O
+![](./img/OOOOOOO-W100.png)
 
-![](./img/OOOOOOO-W100.png) content addressed [persistent data structures](https://en.wikipedia.org/wiki/Persistent_data_structure). The graph is the primary representation. Vertex, edge and property data are fixed size records stored in logical byte arrays. Property values are stored as variable size records in a logical byte array. Internal references are offsets in the logical byte array. The logical byte arrays are partitioned in data blocks using content defined chunking. The data blocks are uniquely identified w/ cryptographic hashes ie. content identifiers. Each individual version of the data structure is uniquely identified w/ a cryptographic hash - _the root_.
+This library enables applications to author, revise, merge, navigate and share trusted, auditable and immutable graph-like data structures. Multi-local, granular and configurable persistence across technologies and providers. The individual persistence atoms (the blocks) are location independent and uniquely identified using cryptographic hashes. Each individual version of the graph data structure is location independent and uniquely identified using a cryptographic handle - _the root_.
 
-# Docs
+## Build
 
--   [Storage format](./doc/storage-format.md)
+```sh
+npm run clean
+npm install
+npm run build
+```
+
+## Test
+
+> Note: Some of the e2e tests expect an IPFS service accessible on the local network.
+
+Example test environment configuration:
+
+```sh
+export IPFS_API=/ip4/192.168.1.100/tcp/5001
+```
+
+```sh
+npm run test
+```
 
 # Storage Providers
 
-The library can store the data across many technologies or providers. The API is fundamentally a key-value store. The key is the content-identifier (CID) of the chunk and the value is the actual byte array fragment associated with the chunk:
+The library can persist graph data across technologies and/or providers using a key-value format. The key is the _content-identifier_ of the block, the value is the actual byte array fragment associated with the block. The library provides a memory based implementation, suitable for testing and development.
 
 ```ts
 interface BlockStore {
@@ -17,20 +35,13 @@ interface BlockStore {
 }
 ```
 
-Few examples of the storage providers:
-
--   [IndexedDB](https://www.npmjs.com/package/@dstanesc/idb-block-store) for browser local
--   [Azure](https://www.npmjs.com/package/@dstanesc/az-block-store)
--   [S3](https://www.npmjs.com/package/@dstanesc/s3-block-store)
--   [IPFS](https://www.npmjs.com/package/@dstanesc/ipfs-block-store)
--   [IPFS over HTTP](https://www.npmjs.com/package/@dstanesc/http-block-store)
--   [Lucy](https://www.npmjs.com/package/@dstanesc/lucy-block-store) to store blocks everywhere
-
 # Graphs
+
+````ts
 
 ## Author
 
-Providing a `proto-schema` is optional. Below creating, updating in parallel and merging changes on a graph structure mimicking a file system:
+Example creating, updating in parallel and merging changes on a graph structure simulating a file system. Providing a `proto-schema` is optional.
 
 ```ts
 /**
@@ -109,7 +120,7 @@ const { root: original } = await tx.commit({
     comment: 'First draft',
     tags: ['v0.0.1'],
 })
-```
+````
 
 ## Revise
 
@@ -322,69 +333,70 @@ for await (const result of navigateVertices(graph, [0], request)) {
 
 ## Bundle
 
-Super important feature for building efficient systems. A bundle is a single large `Block` containing granular `Blocks`. Bundles can be used to optimize data sharing. As any `Block`, bundles can be stored in a BlockStore. See `packer.test.ts` for more examples.
+Bundles are used to optimize data sharing. A bundle is a single large `Block` containing granular `Blocks` clustered according to flexible criteria. Currently is possible to create bundles that:
+
+-   make up a complete graph version
+-   are associated with a particular fragment of a graph (ie. required to answer a particular query)
+-   are associated with a particular commit
+-   are associated with the block index of a complete graph version (eg. to perform fast diffs)
+-   pack together selected blocks (such derived from diff operations)
+
+See tests for examples.
+
+## Trust
+
+Ability to certify the authenticity of the data associated with a particular version by signing the graph root. The author of the data is identified by its public key, stored as a property of the data version as JSON Web Key (JWK).
 
 ```ts
-type Block = {
-    cid: any
-    bytes: Uint8Array
-}
-const g: ProtoGremlin = protoGremlinFactory({
-    chunk,
-    linkCodec,
-    valueCodec,
-    blockStore,
-    versionStore,
-}).g()
+/**
+ * Generate a key pair, in practice this would be done once and persisted
+ */
+const { publicKey, privateKey } = await subtle.generateKey(
+    {
+        name: 'RSA-PSS',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256',
+    },
+    true,
+    ['sign', 'verify']
+)
 
 /**
- * Bundle complete graphs into a single block. The graph is identified by version root.
+ * Sign the root when committing
  */
-const bundle1: Block = await g.pack(root)
+const signer: Signer = signerFactory({ subtle, privateKey, publicKey })
+
+const { root } = await tx.commit({
+    comment: 'First draft',
+    tags: ['v0.0.1'],
+    signer,
+})
 
 /**
- * Bundle a logical section of the graph. The fragment is a collection of sub-graphs.
- * The fragment is identified by the start vertex, count of vertices from the start vertex and the sub-graph depth.
+ * Verify the graph version for authenticity before
  */
-const bundle2: Block = await g.packFragment(798175, 1, 3, root)
-
-/**
- * Bundle single commit
- */
-const tx = g.tx()
-//...
-const commit = await tx.commit({})
-const { packCommit } = graphPackerFactory(linkCodec)
-const bundle3: Block = await packCommit(commit)
-
-/**
- * Unpack the bundle
- */
-const { unpack, restore } = graphPackerFactory(linkCodec)
-const { root, index, blocks } = await unpack(bundle.bytes)
-
-/**
- * Restore the bundle into a new block store
- */
-const remoteStore: MemoryBlockStore = memoryBlockStoreFactory()
-const { root, index, blocks } = await restore(bundle.bytes, remoteStore)
-
-/**
- * Use now the restored bundle for querying
- */
-const g: ProtoGremlin = protoGremlinFactory({
-    chunk,
-    linkCodec,
-    valueCodec,
-    blockStore: remoteStore,
-    versionStore,
-}).g()
-//...
+const { version } = await versionStore.versionGet()
+const trusted = await verify({
+    subtle,
+    publicKey,
+    root: version.root,
+    signature: version.details.signature,
+})
 ```
 
-# Lists
+## Share
 
-Similar to graphs, the library can author, revise, merge and navigate lists. A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties. Vertices are connected with an implicit _parent_ edge.
+Share data and history via the [graph relay](https://github.com/dstanesc/O-O-O-O-O-O-O-R). There are 2 client categories:
+
+-   _Plumbing client_, providing fine granular APIs for history and graph bundles publish and retrieval.
+-   _Basic client_, providing a simple API for complete graph publishing and retrieval. Incremental pull & push support.
+
+See tests in the graph relay [library](https://github.com/dstanesc/O-O-O-O-O-O-O-R) for examples.
+
+## Lists
+
+Similar to graphs, the library can author, revise, merge and navigate lists. A list is a collection of items. An item is a collection of values. Items are stored as vertices in a linear (ie. visually O-O-O-O-O-O-O) graph. Item values are stored as vertex properties.
 
 ```ts
 enum KeyTypes {
@@ -442,113 +454,9 @@ for (let i = 0; i < range.length; i++) {
 }
 ```
 
-# Cryptographic Trust
+## Storage
 
-Ability to certify the authenticity of the data associated with a particular version by signing the graph root.
-
-```ts
-/**
- * Generate a key pair, in practice this would be done once and persisted
- */
-const { publicKey, privateKey } = await subtle.generateKey(
-    {
-        name: 'RSA-PSS',
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: 'SHA-256',
-    },
-    true,
-    ['sign', 'verify']
-)
-
-/**
- * Sign the root while committing
- */
-const signer: Signer = signerFactory({ subtle, privateKey })
-
-const { root } = await tx.commit({
-    comment: 'First draft',
-    tags: ['v0.0.1'],
-    signer,
-})
-
-/**
- * Verify the root before reading / querying
- */
-const { version } = await versionStore.versionGet()
-const trusted = await verify({
-    subtle,
-    publicKey,
-    root: version.root,
-    signature: version.details.signature,
-})
-assert.strictEqual(trusted, true)
-```
-
-# Relay Client
-
-_WIP_
-
-Provides the ability to transport graph history and graph versions to and from a [graph relay](https://github.com/dstanesc/O-O-O-O-O-O-O-R). The history publishing includes relay-side support for merge. There are 2 client categories:
-
-_Plumbing client_, providing fine granular APIs for history and graph bundles publish and retrieval. Bundling multiple blocks together is helping to reduce the number of round-trips between the client and the relay. Following example is using the _plumbing_ client to push an individual version of the graph to a relay.
-
-```ts
-const { packGraphVersion } = graphPackerFactory(linkCodec)
-// ...
-const graph = new Graph(versionStore, graphStore)
-const tx = graph.tx()
-await tx.start()
-// ...
-const { root } = await tx.commit({
-    comment: 'First draft',
-    tags: ['v0.0.1'],
-})
-const graphVersionBundle: Block = await packGraphVersion(root, blockStore)
-const relayClient: RelayClientPlumbing = relayClientPlumbingFactory({
-    baseURL: 'http://localhost:3000',
-})
-const responseGraphVersionPush = await relayClient.graphPush(
-    graphVersionBundle.bytes
-)
-```
-
-_Basic client_, providing a simple API for complete graph publishing and retrieval. Following example is using the _basic client_ to retrieve a complete graph from the relay.
-
-```ts
-const relayClient: RelayClientBasic = relayClientBasicFactory(
-    {
-        chunk,
-        chunkSize,
-        linkCodec,
-        valueCodec,
-        blockStore,
-    },
-    {
-        baseURL: 'http://localhost:3000',
-    }
-)
-const { versionStore, graphStore, graph } = await relayClient.pull(
-    '4f67e4c6-9a9d-4e87-bf29-af0d35a19bdc'
-)
-```
-
-# Multiple APIs
-
-_WIP_
-
--   Native
--   Proto-gremlin
--   ...
-
-## Build
-
-```sh
-npm run clean
-npm install
-npm run build
-npm run test
-```
+-   [Storage format](./doc/storage-format.md)
 
 ## Licenses
 
