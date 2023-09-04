@@ -191,7 +191,7 @@ const { root: second } = await tx2.commit({
 })
 ```
 
-## Merge
+# Merge
 
 ```ts
 /**
