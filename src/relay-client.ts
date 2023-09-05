@@ -467,7 +467,7 @@ const relayClientBasicFactory = (
                     remoteVersionStoreBytes,
                     transientStore
                 )
-                const versionStoreTransient: VersionStore =
+                const versionStoreRemote: VersionStore =
                     await versionStoreFactory({
                         storeRoot: versionStoreRoot,
                         chunk,
@@ -475,8 +475,8 @@ const relayClientBasicFactory = (
                         valueCodec,
                         blockStore: transientStore,
                     })
-                const versions: Version[] = versionStoreTransient.log()
-                for (const version of versions) {
+                const remoteVersions: Version[] = versionStoreRemote.log()
+                for (const version of remoteVersions) {
                     try {
                         await blockStore.get(version.root)
                     } catch (e) {
@@ -491,25 +491,94 @@ const relayClientBasicFactory = (
                         }
                     }
                 }
-                await transientStore.push(blockStore)
-                const versionStore: VersionStore = await versionStoreFactory({
-                    storeRoot: versionStoreRoot,
-                    chunk,
-                    linkCodec,
-                    valueCodec,
-                    blockStore,
-                })
-                const graphStore = graphStoreFactory({
-                    chunk,
-                    linkCodec,
-                    valueCodec,
-                    blockStore,
-                })
-                const graph = new Graph(versionStore, graphStore)
-                return {
-                    versionStore,
-                    graphStore,
-                    graph,
+                if (localVersionStoreRoot !== undefined) {
+                    const localVersionStoreBundle: Block =
+                        await packVersionStore(
+                            localVersionStoreRoot,
+                            blockStore,
+                            chunk,
+                            valueCodec
+                        )
+                    const { root: storeRootExisting } =
+                        await restoreVersionStore(
+                            localVersionStoreBundle.bytes,
+                            transientStore
+                        )
+
+                    const versionStoreLocal: VersionStore =
+                        await versionStoreFactory({
+                            storeRoot: localVersionStoreRoot,
+                            chunk,
+                            linkCodec,
+                            valueCodec,
+                            blockStore: transientStore,
+                        })
+
+                    const localVersions: Version[] = versionStoreLocal.log()
+                    for (const version of localVersions) {
+                        const localGraphVersionBundle = await packGraphVersion(
+                            version.root,
+                            blockStore
+                        )
+                        await restoreGraphVersion(
+                            localGraphVersionBundle.bytes,
+                            transientStore
+                        )
+                    }
+                    const {
+                        root: mergedRoot,
+                        index: mergedIndex,
+                        blocks: mergedBlocks,
+                    } = await versionStoreLocal.mergeVersions(
+                        versionStoreRemote
+                    )
+                    await transientStore.push(blockStore)
+                    const mergedVersionRoot = versionStoreLocal.currentRoot()
+                    const mergedVersionStoreRoot =
+                        versionStoreLocal.versionStoreRoot()
+                    const versionStore: VersionStore =
+                        await versionStoreFactory({
+                            storeRoot: mergedVersionStoreRoot,
+                            versionRoot: mergedVersionRoot,
+                            chunk,
+                            linkCodec,
+                            valueCodec,
+                            blockStore,
+                        })
+                    const graphStore = graphStoreFactory({
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore,
+                    })
+                    const graph = new Graph(versionStore, graphStore)
+                    return {
+                        versionStore,
+                        graphStore,
+                        graph,
+                    }
+                } else {
+                    await transientStore.push(blockStore)
+                    const versionStore: VersionStore =
+                        await versionStoreFactory({
+                            storeRoot: versionStoreRoot,
+                            chunk,
+                            linkCodec,
+                            valueCodec,
+                            blockStore,
+                        })
+                    const graphStore = graphStoreFactory({
+                        chunk,
+                        linkCodec,
+                        valueCodec,
+                        blockStore,
+                    })
+                    const graph = new Graph(versionStore, graphStore)
+                    return {
+                        versionStore,
+                        graphStore,
+                        graph,
+                    }
                 }
             } else {
                 return undefined

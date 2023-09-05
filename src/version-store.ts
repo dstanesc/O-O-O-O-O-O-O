@@ -366,7 +366,15 @@ const versionStoreFactory = async ({
                 rootSet({ root, index, parent: first, mergeParent: second })
                 return { root, index, blocks }
             }
-        } else throw new Error(`Nothing to merge`)
+        } else {
+            const { version, index } = await versionGet()
+            const { extractVersionBlocks } = graphPackerFactory(linkCodec)
+            const blocks: Block[] = await extractVersionBlocks(
+                { root: version.root, index },
+                blockStore
+            )
+            return { root: version.root, index, blocks }
+        }
     }
 
     await init(storeRoot)

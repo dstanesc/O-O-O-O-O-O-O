@@ -451,4 +451,86 @@ describe('Version store merge', function () {
         )
         assert.deepEqual(mergedBlocks, expectedBlocks)
     })
+
+    test('zero change version merge', async () => {
+        const blockStore1: MemoryBlockStore = memoryBlockStoreFactory()
+        /**
+         * Build original data set
+         */
+        const versionStore: VersionStore = await versionStoreFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: blockStore1,
+        })
+
+        const graphStore: GraphStore = graphStoreFactory({
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: blockStore1,
+        })
+
+        const graph = new Graph(versionStore, graphStore)
+
+        const tx = graph.tx()
+
+        await tx.start()
+
+        const v1 = tx.addVertex(ObjectTypes.FOLDER)
+        const v2 = tx.addVertex(ObjectTypes.FOLDER)
+        const v3 = tx.addVertex(ObjectTypes.FILE)
+
+        const e1 = await tx.addEdge(v1, v2, RlshpTypes.CONTAINS)
+        const e2 = await tx.addEdge(v1, v3, RlshpTypes.CONTAINS)
+
+        await tx.addVertexProp(v1, KeyTypes.NAME, 'root-folder', PropTypes.META)
+        await tx.addVertexProp(
+            v2,
+            KeyTypes.NAME,
+            'nested-folder',
+            PropTypes.META
+        )
+        await tx.addVertexProp(v3, KeyTypes.NAME, 'nested-file', PropTypes.META)
+        await tx.addVertexProp(
+            v2,
+            KeyTypes.CONTENT,
+            'hello world from v2',
+            PropTypes.DATA
+        )
+        await tx.addVertexProp(
+            v3,
+            KeyTypes.CONTENT,
+            'hello world from v3',
+            PropTypes.DATA
+        )
+
+        const { root: original } = await tx.commit({})
+
+        const versionStore1: VersionStore = await versionStoreFactory({
+            versionRoot: original,
+            storeRoot: versionStore.versionStoreRoot(),
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: blockStore1,
+        })
+
+        const versionStore2: VersionStore = await versionStoreFactory({
+            versionRoot: original,
+            storeRoot: versionStore.versionStoreRoot(),
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: blockStore1,
+        })
+
+        const {
+            root: mergedRoot,
+            index: mergedIndex,
+            blocks: mergedBlocks,
+        } = await versionStore1.mergeVersions(versionStore2)
+
+        assert.equal(mergedRoot.toString(), original.toString())
+    })
 })
