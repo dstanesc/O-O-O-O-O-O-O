@@ -1,6 +1,12 @@
+# Discontinued 
+
+This project is discontinued. [@ubiquify/core](https://www.npmjs.com/package/@ubiquify/core) fork + [@ubiquify/cyclone](https://www.npmjs.com/package/@ubiquify/cyclone) provide a compatible and more advanced solution.
+
+
 # O-O-O-O-O-O-O
 
 This library enables applications to author, revise, merge, navigate and share trusted, auditable and immutable graph-like data structures. Multi-local, granular and configurable persistence across technologies and providers. The individual persistence atoms (the blocks) are location independent and uniquely identified using cryptographic hashes. Each individual version of the graph data structure is location independent and uniquely identified using a cryptographic handle - _the root_.
+
 
 # Build
 
